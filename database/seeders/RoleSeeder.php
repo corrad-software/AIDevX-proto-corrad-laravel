@@ -24,6 +24,11 @@ class RoleSeeder extends Seeder
                     'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
                     'settings.view', 'settings.edit',
                     'menus.view', 'menus.edit',
+                    'knowledge.view', 'knowledge.manage',
+                    'chat.use', 'chat.admin',
+                    'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
+                    'notifications.admin',
+                    'tickets.view', 'tickets.create', 'tickets.edit', 'tickets.delete', 'tickets.assign', 'tickets.respond',
                 ],
             ]
         );
