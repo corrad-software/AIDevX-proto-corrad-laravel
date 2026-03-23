@@ -120,6 +120,23 @@ class SupportTicketController extends Controller
         return 'TKT-'.now()->format('Ymd').'-'.str_pad((string) $lastId, 6, '0', STR_PAD_LEFT);
     }
 
+    private function canMoveTo(string $from, string $to): bool
+    {
+        if ($from === $to) {
+            return true;
+        }
+        $allowed = [
+            'new' => ['assigned', 'closed'],
+            'assigned' => ['in_progress', 'pending_requestor', 'resolved', 'closed'],
+            'in_progress' => ['pending_requestor', 'resolved', 'closed'],
+            'pending_requestor' => ['in_progress', 'resolved', 'closed'],
+            'resolved' => ['closed', 'in_progress'],
+            'closed' => [],
+        ];
+
+        return in_array($to, $allowed[$from] ?? [], true);
+    }
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -257,6 +274,9 @@ class SupportTicketController extends Controller
             }
             unset($data['status']);
         }
+        if (isset($data['status']) && ! $this->canMoveTo((string) $ticket->status, (string) $data['status'])) {
+            return $this->sendError(409, 'INVALID_STATUS_TRANSITION', 'Invalid ticket status transition');
+        }
 
         $ticket->update($data);
         $ticket->refresh();
@@ -372,6 +392,9 @@ class SupportTicketController extends Controller
         if (! $nextStatus) {
             $nextStatus = $isRequestor ? 'pending_requestor' : 'in_progress';
         }
+        if (! $this->canMoveTo((string) $ticket->status, (string) $nextStatus)) {
+            return $this->sendError(409, 'INVALID_STATUS_TRANSITION', 'Invalid ticket status transition');
+        }
 
         $updates = ['status' => $nextStatus];
         if ($nextStatus === 'closed') {
@@ -419,6 +442,9 @@ class SupportTicketController extends Controller
         $isRequestor = (int) $ticket->created_by_user_id === (int) $actor->id;
         if (! $isRequestor && ! $this->canRespond($actor)) {
             return $this->sendError(403, 'FORBIDDEN', 'You cannot close this ticket');
+        }
+        if (! $this->canMoveTo((string) $ticket->status, 'closed')) {
+            return $this->sendError(409, 'INVALID_STATUS_TRANSITION', 'Invalid ticket status transition');
         }
 
         $ticket->update([

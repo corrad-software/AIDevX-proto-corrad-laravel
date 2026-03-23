@@ -68,4 +68,44 @@ class SupportTicketTest extends TestCase
         $this->assertSame($agent->id, $ticket->assigned_to_user_id);
         $this->assertSame('assigned', $ticket->status);
     }
+
+    public function test_requestor_cannot_delete_ticket_after_assignment(): void
+    {
+        $user = User::factory()->create(['user_level' => UserLevel::USER]);
+        $this->attachPermissions($user, ['tickets.view', 'tickets.create', 'tickets.delete']);
+
+        $ticket = SupportTicket::create([
+            'ticket_number' => 'TKT-TEST-000002',
+            'subject' => 'Need help',
+            'description' => 'Support required',
+            'priority' => 'normal',
+            'status' => 'assigned',
+            'created_by_user_id' => $user->id,
+        ]);
+
+        $res = $this->actingAs($user)->deleteJson('/api/tickets/'.$ticket->id);
+        $res->assertStatus(409);
+    }
+
+    public function test_external_admin_cannot_assign_agent_outside_hierarchy(): void
+    {
+        $l2 = User::factory()->create(['user_level' => UserLevel::EXTERNAL_ADMIN]);
+        $requestor = User::factory()->create(['user_level' => UserLevel::USER, 'managed_by_user_id' => $l2->id]);
+        $agentOutside = User::factory()->create(['user_level' => UserLevel::AGENT]);
+        $this->attachPermissions($l2, ['tickets.view', 'tickets.assign', 'tickets.respond']);
+
+        $ticket = SupportTicket::create([
+            'ticket_number' => 'TKT-TEST-000003',
+            'subject' => 'Need assist',
+            'description' => 'Need assistance',
+            'priority' => 'normal',
+            'status' => 'new',
+            'created_by_user_id' => $requestor->id,
+        ]);
+
+        $assign = $this->actingAs($l2)->postJson('/api/tickets/'.$ticket->id.'/assign', [
+            'assigned_to_user_id' => $agentOutside->id,
+        ]);
+        $assign->assertStatus(403);
+    }
 }
