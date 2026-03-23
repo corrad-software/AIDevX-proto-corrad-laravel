@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AdminLayout from "@/layouts/AdminLayout.vue";
+import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import { useToast } from "@/composables/useToast";
 import { useAuthStore } from "@/stores/auth";
 import {
@@ -15,6 +16,7 @@ import {
   updateSupportTicket,
 } from "@/api/cms";
 import type { SupportTicket, SupportTicketMessage, UserDetail } from "@/types";
+import { markdownToSafeHtml } from "@/utils/markdown";
 import { ChevronLeft, ChevronRight, MessageSquare, PlusCircle, Save, Search, Ticket, UserCheck } from "lucide-vue-next";
 
 const toast = useToast();
@@ -39,20 +41,28 @@ const showCreate = ref(false);
 const createForm = ref({
   subject: "",
   description: "",
+  customerName: "",
+  systemName: "",
   module: "",
-  type: "",
+  type: "bugs" as "bugs" | "request" | "question",
   priority: "normal" as "low" | "normal" | "high" | "urgent",
 });
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const level = computed(() => auth.user?.userLevel ?? "user");
-const perms = computed(() => new Set(auth.user?.permissions ?? []));
-const canCreate = computed(() => level.value === "user" && perms.value.has("tickets.create"));
-const canAssign = computed(
-  () => (level.value === "internal_admin" || level.value === "external_admin" || level.value === "super_admin") && perms.value.has("tickets.assign"),
-);
-const canRespond = computed(() => ["internal_admin", "external_admin", "super_admin", "agent"].includes(level.value) && perms.value.has("tickets.respond"));
-const canEditOwn = computed(() => level.value === "user" && perms.value.has("tickets.edit"));
-const canDeleteOwn = computed(() => level.value === "user" && perms.value.has("tickets.delete"));
+const normalizedLevel = computed(() => String(level.value ?? "").toLowerCase());
+const isLevel4User = computed(() => ["user", "level4", "4"].includes(normalizedLevel.value));
+const canCreate = computed(() => isLevel4User.value);
+const canAssign = computed(() => level.value === "internal_admin" || level.value === "external_admin" || level.value === "super_admin");
+const canRespond = computed(() => ["internal_admin", "external_admin", "super_admin", "agent"].includes(level.value));
+const canEditOwn = computed(() => isLevel4User.value);
+const canDeleteOwn = computed(() => isLevel4User.value);
+
+/** Read-only labels for L4 ticket form (from profile / linked customer). */
+const profileCustomerLabel = computed(() => auth.user?.customerDisplayName?.trim() || auth.user?.customerCode || "—");
+const profileSystemLabel = computed(() => auth.user?.systemDisplayName?.trim() || "—");
+
+const selectedDescriptionHtml = computed(() => markdownToSafeHtml(selected.value?.description ?? ""));
 
 async function load() {
   loading.value = true;
@@ -97,13 +107,23 @@ async function submitCreate() {
     const res = await createSupportTicket({
       subject: createForm.value.subject,
       description: createForm.value.description,
+      customerName: createForm.value.customerName || undefined,
+      systemName: createForm.value.systemName || undefined,
       module: createForm.value.module || undefined,
-      type: createForm.value.type || undefined,
+      type: createForm.value.type,
       priority: createForm.value.priority,
     });
     toast.success("Ticket created");
     showCreate.value = false;
-    createForm.value = { subject: "", description: "", module: "", type: "", priority: "normal" };
+    createForm.value = {
+      subject: "",
+      description: "",
+      customerName: auth.user?.customerCode ?? "",
+      systemName: "",
+      module: "",
+      type: "bugs",
+      priority: "normal",
+    };
     await load();
     await openDetail(res.data);
   } catch (e) {
@@ -119,6 +139,8 @@ async function saveOwnTicket() {
       description: selected.value.description,
       module: selected.value.module ?? undefined,
       type: selected.value.type ?? undefined,
+      customerName: selected.value.customerName ?? undefined,
+      systemName: selected.value.systemName ?? undefined,
       priority: selected.value.priority,
     });
     selected.value = { ...selected.value, ...res.data };
@@ -185,10 +207,30 @@ async function closeTicketNow() {
 }
 
 onMounted(async () => {
+  await auth.refreshUser();
+  createForm.value.customerName = auth.user?.customerDisplayName?.trim() || auth.user?.customerCode || "";
+  createForm.value.systemName = auth.user?.systemDisplayName?.trim() || "";
+  if (canCreate.value) {
+    showCreate.value = true;
+  }
   await load();
   if (canAssign.value) {
     await loadAgents();
   }
+});
+
+watch(statusFilter, async () => {
+  page.value = 1;
+  await load();
+});
+
+watch(q, () => {
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    searchDebounce = null;
+    page.value = 1;
+    void load();
+  }, 250);
 });
 </script>
 
@@ -200,30 +242,38 @@ onMounted(async () => {
           <Ticket class="h-6 w-6 text-[var(--accent-600)]" />
           Ticket
         </h1>
-        <button
-          v-if="canCreate"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-          @click="showCreate = !showCreate"
-        >
+        <button v-if="canCreate" type="button" class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white" @click="showCreate = !showCreate">
           <PlusCircle class="h-4 w-4" />
-          {{ showCreate ? "Cancel" : "Create Ticket" }}
+          {{ showCreate ? "Hide Form" : "Create Ticket" }}
         </button>
       </div>
 
-      <div v-if="showCreate" class="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div v-if="canCreate && showCreate" class="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 class="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">New Ticket</h2>
+        <div class="mb-3 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+          <p><span class="font-semibold text-slate-800 dark:text-slate-100">Customer:</span> {{ profileCustomerLabel }}</p>
+          <p class="mt-1"><span class="font-semibold text-slate-800 dark:text-slate-100">System name:</span> {{ profileSystemLabel }}</p>
+          <p class="mt-1 text-slate-500">You can adjust the values below if needed for this ticket.</p>
+        </div>
         <div class="grid gap-3 md:grid-cols-2">
           <input v-model="createForm.subject" class="rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="Subject" />
+          <input v-model="createForm.customerName" class="rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="Customer" />
+          <input v-model="createForm.systemName" class="rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="System Name" />
           <input v-model="createForm.module" class="rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="Module (e.g. Cashbook)" />
-          <input v-model="createForm.type" class="rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="Type (bug/request/question)" />
+          <select v-model="createForm.type" class="rounded border px-3 py-2 text-sm dark:bg-slate-950">
+            <option value="bugs">Bugs</option>
+            <option value="request">Request</option>
+            <option value="question">Question</option>
+          </select>
           <select v-model="createForm.priority" class="rounded border px-3 py-2 text-sm dark:bg-slate-950">
             <option value="low">Low</option>
             <option value="normal">Normal</option>
             <option value="high">High</option>
             <option value="urgent">Urgent</option>
           </select>
-          <textarea v-model="createForm.description" class="md:col-span-2 min-h-[100px] rounded border px-3 py-2 text-sm dark:bg-slate-950" placeholder="Describe your issue..." />
+          <div class="md:col-span-2">
+            <MarkdownEditor v-model="createForm.description" :rows="8" :enable-image-upload="true" placeholder="Describe your issue..." />
+          </div>
         </div>
         <button class="mt-3 inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white" @click="submitCreate">
           <Save class="h-4 w-4" />
@@ -248,7 +298,7 @@ onMounted(async () => {
               <option value="closed">Closed</option>
             </select>
           </div>
-          <div class="max-h-[70vh] overflow-y-auto">
+          <div class="max-h-[70vh] min-h-[220px] overflow-y-auto">
             <div v-if="loading" class="p-4 text-sm text-slate-500">Loading...</div>
             <button
               v-for="t in rows"
@@ -258,9 +308,13 @@ onMounted(async () => {
               @click="openDetail(t)"
             >
               <p class="truncate text-sm font-medium">{{ t.ticketNumber }} · {{ t.subject }}</p>
+              <p class="mt-0.5 truncate text-xs text-slate-500">{{ t.customerName || "-" }} · {{ t.systemName || "-" }}</p>
               <p class="mt-0.5 text-xs text-slate-500">{{ t.status }} · {{ t.priority }}</p>
             </button>
-            <div v-if="!loading && rows.length === 0" class="p-4 text-sm text-slate-500">No tickets</div>
+            <div v-if="!loading && rows.length === 0" class="p-4 text-sm text-slate-500">
+              No tickets
+              <span v-if="canCreate" class="block pt-1 text-xs text-slate-400">Create ticket using the form above, then it will appear in this list.</span>
+            </div>
           </div>
           <div v-if="meta && (meta.totalPages ?? 1) > 1" class="flex items-center justify-between border-t p-2 text-xs">
             <span>{{ meta.page }}/{{ meta.totalPages }}</span>
@@ -279,14 +333,17 @@ onMounted(async () => {
               <div>
                 <p class="text-sm text-slate-500">{{ selected.ticketNumber }}</p>
                 <h2 class="text-lg font-semibold">{{ selected.subject }}</h2>
-                <p class="text-sm text-slate-600">{{ selected.description }}</p>
+                <div class="ticket-desc-preview prose prose-sm max-w-none text-slate-700 dark:prose-invert" v-html="selectedDescriptionHtml" />
               </div>
               <span class="rounded border px-2 py-1 text-xs">{{ selected.status }}</span>
             </div>
 
             <div class="grid gap-2 md:grid-cols-3 text-xs text-slate-500">
+              <div>Customer: <span class="font-medium text-slate-700">{{ selected.customerName || "-" }}</span></div>
+              <div>System: <span class="font-medium text-slate-700">{{ selected.systemName || "-" }}</span></div>
               <div>Priority: <span class="font-medium text-slate-700">{{ selected.priority }}</span></div>
               <div>Module: <span class="font-medium text-slate-700">{{ selected.module || "-" }}</span></div>
+              <div>Type: <span class="font-medium text-slate-700">{{ selected.type || "-" }}</span></div>
               <div>Assignee: <span class="font-medium text-slate-700">{{ selected.assignee?.name || "-" }}</span></div>
             </div>
 
@@ -306,7 +363,16 @@ onMounted(async () => {
             <div v-if="canEditOwn && selected.createdByUserId === auth.user?.id && (selected.status === 'new' || selected.status === 'pending_requestor')" class="rounded border p-3">
               <p class="mb-2 text-xs font-semibold text-slate-600">Edit your ticket</p>
               <input v-model="selected.subject" class="mb-2 w-full rounded border px-2 py-2 text-sm dark:bg-slate-950" />
-              <textarea v-model="selected.description" class="w-full rounded border px-2 py-2 text-sm dark:bg-slate-950" />
+              <div class="grid gap-2 md:grid-cols-2 mb-2">
+                <input v-model="selected.customerName" class="rounded border px-2 py-2 text-sm dark:bg-slate-950" placeholder="Customer" />
+                <input v-model="selected.systemName" class="rounded border px-2 py-2 text-sm dark:bg-slate-950" placeholder="System Name" />
+                <select v-model="selected.type" class="rounded border px-2 py-2 text-sm dark:bg-slate-950">
+                  <option value="bugs">Bugs</option>
+                  <option value="request">Request</option>
+                  <option value="question">Question</option>
+                </select>
+              </div>
+              <MarkdownEditor v-model="selected.description" :rows="8" :enable-image-upload="true" placeholder="Describe your issue..." />
               <div class="mt-2 flex gap-2">
                 <button class="rounded bg-slate-900 px-3 py-1.5 text-xs text-white" @click="saveOwnTicket">Save</button>
                 <button v-if="canDeleteOwn && selected.status === 'new'" class="rounded border border-rose-300 px-3 py-1.5 text-xs text-rose-600" @click="removeOwnTicket">Delete</button>
@@ -335,3 +401,31 @@ onMounted(async () => {
     </div>
   </AdminLayout>
 </template>
+
+<style scoped>
+.ticket-desc-preview :deep(p) {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+  color: rgb(51 65 85);
+}
+.ticket-desc-preview :deep(ul),
+.ticket-desc-preview :deep(ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.ticket-desc-preview :deep(a) {
+  color: rgb(124 58 237);
+  text-decoration: underline;
+}
+.ticket-desc-preview :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+}
+.ticket-desc-preview :deep(strong) {
+  font-weight: 600;
+}
+.ticket-desc-preview :deep(u) {
+  text-decoration: underline;
+}
+</style>

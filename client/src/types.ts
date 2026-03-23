@@ -14,6 +14,10 @@ export type User = {
   role?: string;
   userLevel?: string;
   customerCode?: string;
+  /** From linked Customer row (for ticket form display). */
+  customerDisplayName?: string | null;
+  /** From linked Customer row (system / product name). */
+  systemDisplayName?: string | null;
   emailVerifiedAt?: string | null;
   /** RBAC: menu item IDs the user can access. null/empty = full access. */
   menuAccess?: string[] | null;
@@ -403,8 +407,10 @@ export type SupportTicket = {
   ticketNumber: string;
   subject: string;
   description: string;
+  customerName?: string | null;
+  systemName?: string | null;
   module?: string | null;
-  type?: string | null;
+  type?: "bugs" | "request" | "question" | null;
   priority: SupportTicketPriority;
   status: SupportTicketStatus;
   createdByUserId: number;

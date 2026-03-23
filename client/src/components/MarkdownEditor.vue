@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 
+import { useToast } from "@/composables/useToast";
 import { markdownToSafeHtml } from "@/utils/markdown";
 
-const props = defineProps<{
-  modelValue: string;
-  placeholder?: string;
-  rows?: number;
-}>();
+const toast = useToast();
+
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    placeholder?: string;
+    rows?: number;
+    /** Upload image via Media API and insert markdown image line. */
+    enableImageUpload?: boolean;
+  }>(),
+  { enableImageUpload: false },
+);
 
 const emit = defineEmits<{
   (event: "update:modelValue", value: string): void;
 }>();
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const imageInputRef = ref<HTMLInputElement | null>(null);
+const imageUploading = ref(false);
 const mode = ref<"write" | "preview">("write");
 
 const safeHtml = computed(() => markdownToSafeHtml(props.modelValue || ""));
@@ -54,6 +64,29 @@ function insertLine(snippet: string) {
     el.setSelectionRange(cursor, cursor);
   });
 }
+
+function triggerImagePick() {
+  imageInputRef.value?.click();
+}
+
+async function onImageSelected(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  imageUploading.value = true;
+  try {
+    const { uploadMedia } = await import("@/api/cms");
+    const res = await uploadMedia(file);
+    const url = res.data.url;
+    const base = file.name.replace(/\.[^.]+$/, "") || "image";
+    insertLine(`![${base}](${url})\n`);
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : "Image upload failed");
+  } finally {
+    imageUploading.value = false;
+    input.value = "";
+  }
+}
 </script>
 
 <template>
@@ -80,10 +113,32 @@ function insertLine(snippet: string) {
       <div v-if="mode === 'write'" class="flex flex-wrap items-center gap-1">
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="surroundSelection('**')">Bold</button>
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="surroundSelection('_')">Italic</button>
+        <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="surroundSelection('<u>', '</u>')">Underline</button>
+        <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="surroundSelection('~~')">Strike</button>
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('## Heading\\n')">H2</button>
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('- List item\\n')">List</button>
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('[Link text](https://example.com)\\n')">Link</button>
+        <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('![Image alt](https://example.com/image.png)\\n')">Image</button>
+        <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('[Menu link](/admin/kerisi/ticket)\\n')">Menu Link</button>
+        <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="insertLine('🙂')">Emoji</button>
         <button type="button" class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50" @click="surroundSelection('`')">Code</button>
+        <input
+          v-if="enableImageUpload"
+          ref="imageInputRef"
+          type="file"
+          class="hidden"
+          accept="image/*"
+          @change="onImageSelected"
+        />
+        <button
+          v-if="enableImageUpload"
+          type="button"
+          class="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+          :disabled="imageUploading"
+          @click="triggerImagePick"
+        >
+          {{ imageUploading ? "Uploading…" : "Upload image" }}
+        </button>
       </div>
     </div>
 

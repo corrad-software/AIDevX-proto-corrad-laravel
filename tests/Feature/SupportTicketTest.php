@@ -108,4 +108,25 @@ class SupportTicketTest extends TestCase
         ]);
         $assign->assertStatus(403);
     }
+
+    public function test_internal_admin_with_mixed_case_user_level_sees_all_tickets(): void
+    {
+        $l1 = User::factory()->create(['user_level' => 'INTERNAL_ADMIN']);
+        $this->attachPermissions($l1, ['tickets.view']);
+
+        $requestor = User::factory()->create(['user_level' => UserLevel::USER]);
+        SupportTicket::create([
+            'ticket_number' => 'TKT-TEST-MIXED-001',
+            'subject' => 'From L4',
+            'description' => 'Body',
+            'priority' => 'normal',
+            'status' => 'new',
+            'created_by_user_id' => $requestor->id,
+        ]);
+
+        $list = $this->actingAs($l1)->getJson('/api/tickets?page=1&limit=20');
+        $list->assertOk();
+        $this->assertGreaterThanOrEqual(1, count($list->json('data')));
+        $this->assertSame('TKT-TEST-MIXED-001', $list->json('data.0.ticketNumber'));
+    }
 }

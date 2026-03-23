@@ -57,6 +57,10 @@ class SupportTicketController extends Controller
         if ($level === UserLevel::SUPER_ADMIN) {
             return $query;
         }
+        if ($level === UserLevel::INTERNAL_ADMIN) {
+            // Level 1 handles all incoming tickets for first-line review.
+            return $query;
+        }
 
         $visibleIds = $this->visibleUserIds($actor);
         if ($level === UserLevel::USER) {
@@ -86,6 +90,8 @@ class SupportTicketController extends Controller
             'ticket_number' => $ticket->ticket_number,
             'subject' => $ticket->subject,
             'description' => $ticket->description,
+            'customer_name' => $ticket->customer_name,
+            'system_name' => $ticket->system_name,
             'module' => $ticket->module,
             'type' => $ticket->type,
             'priority' => $ticket->priority,
@@ -152,7 +158,9 @@ class SupportTicketController extends Controller
             $query->where(function ($b) use ($qLower) {
                 $b->whereRaw('LOWER(ticket_number) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereRaw('LOWER(subject) LIKE ?', ['%'.$qLower.'%'])
-                    ->orWhereRaw('LOWER(description) LIKE ?', ['%'.$qLower.'%']);
+                    ->orWhereRaw('LOWER(description) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(COALESCE(customer_name, "")) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(COALESCE(system_name, "")) LIKE ?', ['%'.$qLower.'%']);
             });
         }
         if ($status) {
@@ -180,10 +188,13 @@ class SupportTicketController extends Controller
 
         $data = $request->validated();
         $ticket = DB::transaction(function () use ($actor, $data) {
+            $customer = $actor->customers()->select(['customer_name', 'system_name'])->first();
             $ticket = SupportTicket::create([
                 'ticket_number' => $this->nextTicketNumber(),
                 'subject' => $data['subject'],
                 'description' => $data['description'],
+                'customer_name' => $data['customer_name'] ?? $customer?->customer_name ?? $actor->customer_code,
+                'system_name' => $data['system_name'] ?? $customer?->system_name ?? null,
                 'module' => $data['module'] ?? null,
                 'type' => $data['type'] ?? null,
                 'priority' => $data['priority'] ?? 'normal',
