@@ -168,3 +168,30 @@ export type AuditLog = {
   createdAt: string;
   user?: { id: number; name: string; email: string } | null;
 };
+
+export type DbEditorColumnType = "string" | "text" | "longText" | "integer" | "bigInteger" | "boolean" | "dateTime" | "json";
+
+export type DbEditorColumn = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  default: unknown;
+  isPrimary: boolean;
+  extra: string | null;
+};
+
+export type DbEditorSchema = {
+  table: string;
+  primaryKey: string | null;
+  columns: DbEditorColumn[];
+  rowCount: number;
+};
+
+export type DbEditorRowsPayload = {
+  table: string;
+  page: number;
+  limit: number;
+  total: number;
+  rows: Record<string, unknown>[];
+  primaryKey: string | null;
+};

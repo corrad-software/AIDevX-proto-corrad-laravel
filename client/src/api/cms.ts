@@ -2,6 +2,9 @@ import { apiRequest } from "./client";
 import type {
   AuditLog,
   Category,
+  DbEditorColumnType,
+  DbEditorRowsPayload,
+  DbEditorSchema,
   CategoryInput,
   Media,
   MediaMetadataInput,
@@ -205,5 +208,62 @@ export async function updateDevelopersGuide(content: string) {
   return apiRequest<{ data: { success: boolean; syncFiles: { filename: string; path?: string; exists: boolean; inSync: boolean; readOnly?: boolean; role?: "canonical" | "mirror" }[] } }>("/api/developers-guide", {
     method: "PUT",
     body: JSON.stringify({ content }),
+  });
+}
+
+// Database Editor
+export async function listDbTables() {
+  return apiRequest<{ data: { tables: string[]; driver: string; database: string } }>("/api/db-editor/tables");
+}
+
+export async function getDbTableSchema(table: string) {
+  return apiRequest<{ data: DbEditorSchema }>(`/api/db-editor/tables/${encodeURIComponent(table)}/schema`);
+}
+
+export async function getDbTableRows(table: string, page = 1, limit = 25) {
+  return apiRequest<{ data: DbEditorRowsPayload }>(
+    `/api/db-editor/tables/${encodeURIComponent(table)}/rows?page=${page}&limit=${limit}`,
+  );
+}
+
+export async function createDbRow(table: string, data: Record<string, unknown>) {
+  return apiRequest<{ data: { message: string } }>(`/api/db-editor/tables/${encodeURIComponent(table)}/rows`, {
+    method: "POST",
+    body: JSON.stringify({ data }),
+  });
+}
+
+export async function updateDbRow(table: string, rowId: string | number, data: Record<string, unknown>) {
+  return apiRequest<{ data: { message: string } }>(
+    `/api/db-editor/tables/${encodeURIComponent(table)}/rows/${encodeURIComponent(String(rowId))}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+    },
+  );
+}
+
+export async function deleteDbRow(table: string, rowId: string | number) {
+  return apiRequest<{ data: { message: string } }>(
+    `/api/db-editor/tables/${encodeURIComponent(table)}/rows/${encodeURIComponent(String(rowId))}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function createDbTable(input: {
+  table: string;
+  columns: { name: string; type: DbEditorColumnType; nullable?: boolean }[];
+  primaryKey?: string;
+  withTimestamps?: boolean;
+}) {
+  return apiRequest<{ data: { message: string } }>("/api/db-editor/tables", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteDbTable(table: string) {
+  return apiRequest<{ data: { message: string } }>(`/api/db-editor/tables/${encodeURIComponent(table)}`, {
+    method: "DELETE",
   });
 }

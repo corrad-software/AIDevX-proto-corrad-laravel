@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DatabaseEditorController;
 use App\Http\Controllers\Api\DevelopersGuideController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PageController;
@@ -63,4 +64,15 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
 
     Route::get('/developers-guide', [DevelopersGuideController::class, 'show']);
     Route::put('/developers-guide', [DevelopersGuideController::class, 'update']);
+
+    Route::prefix('db-editor')->group(function () {
+        Route::get('/tables', [DatabaseEditorController::class, 'listTables']);
+        Route::post('/tables', [DatabaseEditorController::class, 'createTable']);
+        Route::get('/tables/{table}/schema', [DatabaseEditorController::class, 'tableSchema']);
+        Route::delete('/tables/{table}', [DatabaseEditorController::class, 'dropTable']);
+        Route::get('/tables/{table}/rows', [DatabaseEditorController::class, 'tableRows']);
+        Route::post('/tables/{table}/rows', [DatabaseEditorController::class, 'createRow']);
+        Route::put('/tables/{table}/rows/{rowId}', [DatabaseEditorController::class, 'updateRow']);
+        Route::delete('/tables/{table}/rows/{rowId}', [DatabaseEditorController::class, 'deleteRow']);
+    });
 });

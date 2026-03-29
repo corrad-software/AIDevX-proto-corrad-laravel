@@ -190,6 +190,7 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
     label: "Administration",
     items: [
       { id: "menus", label: "Menus", to: "/admin/menus", icon: Menu },
+      { id: "db-editor", label: "Database Editor", to: "/admin/administration/database-editor", icon: Database },
       {
         id: "settings",
         label: "Settings",

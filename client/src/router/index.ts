@@ -15,6 +15,7 @@ import PostsListView from "@/views/PostsListView.vue";
 import CategoriesListView from "@/views/CategoriesListView.vue";
 import CategoryEditorView from "@/views/CategoryEditorView.vue";
 import DatabaseSchemaView from "@/views/DatabaseSchemaView.vue";
+import DatabaseEditorView from "@/views/DatabaseEditorView.vue";
 import DevelopersGuideView from "@/views/DevelopersGuideView.vue";
 import ApiManagementView from "@/views/ApiManagementView.vue";
 import MenusView from "@/views/MenusView.vue";
@@ -119,6 +120,7 @@ const router = createRouter({
     // ── Administration ──
     { path: "/admin/settings", name: "settings", component: SettingsView, meta: { requiresAuth: true, title: "Settings" } },
     { path: "/admin/settings/system", name: "settings-system", component: SystemInfoView, meta: { requiresAuth: true, title: "System Info" } },
+    { path: "/admin/administration/database-editor", name: "administration-db-editor", component: DatabaseEditorView, meta: { requiresAuth: true, title: "Database Editor" } },
 
     // ── Core Platform: Identity & Access ──
     { path: "/admin/platform/identity", redirect: "/admin/platform/identity/users" },
