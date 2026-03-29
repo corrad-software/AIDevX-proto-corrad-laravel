@@ -21,8 +21,8 @@ Route::prefix('public')->group(function () {
     Route::get('/pages/{slug}', [PublicController::class, 'pageBySlug']);
 });
 
-// Auth routes
-Route::prefix('auth')->group(function () {
+// Auth routes (session-based Sanctum SPA login requires web middleware)
+Route::prefix('auth')->middleware('web')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -38,8 +38,8 @@ Route::prefix('auth')->group(function () {
 // Settings GET is public (used by SPA before auth)
 Route::get('/settings', [SettingController::class, 'index']);
 
-// Protected admin routes
-Route::middleware('auth:sanctum')->group(function () {
+// Protected admin routes (session-based Sanctum SPA requires web + auth:sanctum)
+Route::middleware(['web', 'auth:sanctum'])->group(function () {
     Route::apiResource('posts', PostController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('pages', PageController::class);

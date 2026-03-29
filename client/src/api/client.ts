@@ -7,6 +7,9 @@ function getCsrfToken(): string {
 
 function buildHeaders(init?: HeadersInit) {
   const headers = new Headers(init ?? {});
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json");
+  }
   if (!headers.has("Content-Type") && !(init instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
