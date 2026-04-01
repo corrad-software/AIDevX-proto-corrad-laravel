@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SettingService
 {
@@ -10,22 +11,47 @@ class SettingService
      * Default setting keys and their default values.
      */
     protected array $defaults = [
-        'siteTitle'       => '',
-        'tagline'         => '',
-        'webfrontTitle'   => '',
+        'siteTitle' => '',
+        'tagline' => '',
+        'webfrontTitle' => '',
         'webfrontTagline' => '',
-        'titleFormat'     => '%page% | %site%',
+        'titleFormat' => '%page% | %site%',
         'metaDescription' => '',
-        'siteIconUrl'     => '',
+        'siteIconUrl' => '',
         'webfrontLogoUrl' => '',
-        'sidebarLogoUrl'  => '',
-        'faviconUrl'      => '',
-        'language'        => 'en',
-        'timezone'        => 'UTC',
-        'footerText'      => '',
-        'frontPageId'     => null,
-        'storefrontMenu'  => null,
-        'adminMenuPrefs'  => null,
+        'sidebarLogoUrl' => '',
+        'faviconUrl' => '',
+        'language' => 'en',
+        'timezone' => 'UTC',
+        'footerText' => '',
+        'frontPageId' => null,
+        'storefrontMenu' => null,
+        'adminMenuPrefs' => null,
+        'lookupSystem' => ['KERISI', 'iAGC', 'eGPA'],
+        /** Reference labels for hierarchy (DB `users.user_level`: super_admin … user, secondary_user). */
+        'lookupUserLevel' => [
+            ['code' => '0', 'desc' => 'developer'],
+            ['code' => '1', 'desc' => 'admin internal'],
+            ['code' => '2', 'desc' => 'admin external'],
+            ['code' => '3', 'desc' => 'agent'],
+            ['code' => '4', 'desc' => 'user'],
+            ['code' => '5', 'desc' => 'secondary user'],
+        ],
+        /** Reference for user category (e.g. tempatan / luar negara); optional use on forms. */
+        'lookupUserCategory' => [
+            ['code' => 'tempatan', 'desc' => 'user tempatan'],
+            ['code' => 'luar_negara', 'desc' => 'luar negara'],
+        ],
+        /** User segment (code + description), e.g. government vs private; optional use on forms / reporting. */
+        'lookupUserSegment' => [
+            ['code' => '1', 'desc' => 'Government'],
+            ['code' => '2', 'desc' => 'Private'],
+        ],
+        /** Jenis pengguna (kod + keterangan); contoh tempatan / luar negara. */
+        'lookupUserJenisPengguna' => [
+            ['code' => '1', 'desc' => 'Tempatan'],
+            ['code' => '2', 'desc' => 'Luar negara'],
+        ],
     ];
 
     /**
@@ -34,22 +60,27 @@ class SettingService
      * @var array<string, array<int, string>>
      */
     protected array $aliases = [
-        'siteTitle'       => ['siteTitle', 'site_title'],
-        'tagline'         => ['tagline'],
-        'webfrontTitle'   => ['webfrontTitle', 'webfront_title'],
+        'siteTitle' => ['siteTitle', 'site_title'],
+        'tagline' => ['tagline'],
+        'webfrontTitle' => ['webfrontTitle', 'webfront_title'],
         'webfrontTagline' => ['webfrontTagline', 'webfront_tagline'],
-        'titleFormat'     => ['titleFormat', 'title_format'],
+        'titleFormat' => ['titleFormat', 'title_format'],
         'metaDescription' => ['metaDescription', 'meta_description'],
-        'siteIconUrl'     => ['siteIconUrl', 'site_icon_url'],
+        'siteIconUrl' => ['siteIconUrl', 'site_icon_url'],
         'webfrontLogoUrl' => ['webfrontLogoUrl', 'webfront_logo_url'],
-        'sidebarLogoUrl'  => ['sidebarLogoUrl', 'sidebar_logo_url'],
-        'faviconUrl'      => ['faviconUrl', 'favicon_url'],
-        'language'        => ['language'],
-        'timezone'        => ['timezone'],
-        'footerText'      => ['footerText', 'footer_text'],
-        'frontPageId'     => ['frontPageId', 'frontpageId', 'frontpage_id'],
-        'storefrontMenu'  => ['storefrontMenu', 'storefront_menu'],
-        'adminMenuPrefs'  => ['adminMenuPrefs', 'admin_menu_prefs'],
+        'sidebarLogoUrl' => ['sidebarLogoUrl', 'sidebar_logo_url'],
+        'faviconUrl' => ['faviconUrl', 'favicon_url'],
+        'language' => ['language'],
+        'timezone' => ['timezone'],
+        'footerText' => ['footerText', 'footer_text'],
+        'frontPageId' => ['frontPageId', 'frontpageId', 'frontpage_id'],
+        'storefrontMenu' => ['storefrontMenu', 'storefront_menu'],
+        'adminMenuPrefs' => ['adminMenuPrefs', 'admin_menu_prefs'],
+        'lookupSystem' => ['lookupSystem', 'lookup_system'],
+        'lookupUserLevel' => ['lookupUserLevel', 'lookup_user_level'],
+        'lookupUserCategory' => ['lookupUserCategory', 'lookup_user_category'],
+        'lookupUserSegment' => ['lookupUserSegment', 'lookup_user_segment'],
+        'lookupUserJenisPengguna' => ['lookupUserJenisPengguna', 'lookup_user_jenis_pengguna'],
     ];
 
     /**
@@ -72,8 +103,7 @@ class SettingService
     /**
      * Update multiple settings at once, upserting each key within a transaction.
      *
-     * @param array<string, mixed> $data
-     * @return void
+     * @param  array<string, mixed>  $data
      */
     public function update(array $data): void
     {
@@ -100,9 +130,7 @@ class SettingService
     /**
      * Retrieve a single setting value.
      *
-     * @param string     $key
-     * @param mixed|null $default
-     * @return string|null
+     * @param  mixed|null  $default
      */
     public function get(string $key, $default = null): ?string
     {
@@ -119,10 +147,6 @@ class SettingService
 
     /**
      * Set a single setting value.
-     *
-     * @param string $key
-     * @param string $value
-     * @return void
      */
     public function set(string $key, string $value): void
     {
@@ -135,8 +159,7 @@ class SettingService
     /**
      * Serialize a value for storage in the settings table.
      *
-     * @param mixed $value
-     * @return string
+     * @param  mixed  $value
      */
     protected function serializeValue($value): string
     {
@@ -154,9 +177,8 @@ class SettingService
     /**
      * Resolve a canonical setting key from DB rows and legacy aliases.
      *
-     * @param string $key
-     * @param array<string, mixed> $rows
-     * @param mixed $default
+     * @param  array<string, mixed>  $rows
+     * @param  mixed  $default
      * @return mixed
      */
     protected function resolveValueByAlias(string $key, array $rows, $default)
@@ -164,7 +186,7 @@ class SettingService
         $candidates = $this->aliases[$key] ?? [$key];
 
         foreach ($candidates as $candidate) {
-            if (!array_key_exists($candidate, $rows)) {
+            if (! array_key_exists($candidate, $rows)) {
                 continue;
             }
 
@@ -182,9 +204,153 @@ class SettingService
                 return null;
             }
 
+            if ($key === 'lookupSystem' && is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                return is_array($decoded) ? $decoded : $default;
+            }
+
+            if ($key === 'lookupUserLevel' && is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                if (! is_array($decoded)) {
+                    return $default;
+                }
+
+                return $this->normalizeLookupUserLevelRows($decoded, $default);
+            }
+
+            if ($key === 'lookupUserCategory' && is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                if (! is_array($decoded)) {
+                    return $default;
+                }
+
+                return $this->normalizeLookupUserLevelRows($decoded, $default);
+            }
+
+            if ($key === 'lookupUserSegment' && is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                if (! is_array($decoded)) {
+                    return $default;
+                }
+
+                return $this->normalizeLookupUserLevelRows($decoded, $default);
+            }
+
+            if ($key === 'lookupUserJenisPengguna' && is_string($value)) {
+                $decoded = json_decode($value, true);
+
+                if (! is_array($decoded)) {
+                    return $default;
+                }
+
+                return $this->normalizeLookupUserLevelRows($decoded, $default);
+            }
+
             return $value;
         }
 
         return $default;
+    }
+
+    /**
+     * Default user-level lookup rows (code + desc).
+     *
+     * @return array<int, array{code: string, desc: string}>
+     */
+    public function defaultLookupUserLevel(): array
+    {
+        return $this->defaults['lookupUserLevel'];
+    }
+
+    /**
+     * @return array<int, array{code: string, desc: string}>
+     */
+    public function defaultLookupUserCategory(): array
+    {
+        return $this->defaults['lookupUserCategory'];
+    }
+
+    /**
+     * @return array<int, array{code: string, desc: string}>
+     */
+    public function defaultLookupUserSegment(): array
+    {
+        return $this->defaults['lookupUserSegment'];
+    }
+
+    /**
+     * @return array<int, array{code: string, desc: string}>
+     */
+    public function defaultLookupUserJenisPengguna(): array
+    {
+        return $this->defaults['lookupUserJenisPengguna'];
+    }
+
+    /**
+     * Normalize user-level lookup: legacy "0 - developer" strings, or rows with desc / label.
+     *
+     * @param  array<int, mixed>  $items
+     * @param  array<int, array{code: string, desc: string}>  $default
+     * @return array<int, array{code: string, desc: string}>
+     */
+    protected function normalizeLookupUserLevelRows(array $items, array $default): array
+    {
+        $out = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                if (preg_match('/^\s*(\S+)\s*-\s*(.+)$/u', $item, $m)) {
+                    $out[] = ['code' => trim($m[1]), 'desc' => trim($m[2])];
+                }
+
+                continue;
+            }
+            if (is_array($item)) {
+                $code = isset($item['code']) ? trim((string) $item['code']) : '';
+                $desc = isset($item['desc']) ? trim((string) $item['desc']) : '';
+                if ($desc === '' && isset($item['label'])) {
+                    $desc = trim((string) $item['label']);
+                }
+                if ($desc === '' && isset($item['description'])) {
+                    $desc = trim((string) $item['description']);
+                }
+                if ($code !== '' && $desc !== '') {
+                    $out[] = ['code' => $code, 'desc' => $desc];
+                }
+            }
+        }
+
+        return $out !== [] ? $out : $default;
+    }
+
+    /**
+     * Get lookup options for a given key (e.g. 'system' → string list, 'userLevel' → code/desc rows).
+     *
+     * @return array<int, string>|array<int, array{code: string, desc: string}>
+     */
+    public function getLookup(string $key): array
+    {
+        $settingKey = 'lookup'.Str::studly($key);
+        if (! isset($this->defaults[$settingKey])) {
+            return [];
+        }
+
+        $value = $this->getAll()[$settingKey] ?? $this->defaults[$settingKey];
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * Update a lookup (string list for system; code/desc rows for userLevel).
+     *
+     * @param  array<int, string>|array<int, array{code: string, desc: string}>  $options
+     */
+    public function setLookup(string $key, array $options): void
+    {
+        $settingKey = 'lookup'.Str::studly($key);
+        $this->set($settingKey, json_encode($options));
     }
 }

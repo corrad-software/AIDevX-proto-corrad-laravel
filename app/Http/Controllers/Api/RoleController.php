@@ -7,11 +7,25 @@ use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Traits\ApiResponse;
 use App\Models\Role;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 
 class RoleController extends Controller
 {
     use ApiResponse;
+
+    /**
+     * DB column `roles.description` is NOT NULL. ConvertEmptyStringsToNull middleware + nullable
+     * validation turns "" into null — persist as empty string instead of violating NOT NULL.
+     */
+    private function normalizeDescription(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        return (string) $value;
+    }
 
     /**
      * List all roles with user count.
@@ -32,17 +46,35 @@ class RoleController extends Controller
     {
         $data = $request->validated();
 
-        // Check name uniqueness
-        $existing = Role::where('name', $data['name'])->first();
+        // Check name uniqueness (case-insensitive)
+        $existing = Role::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
         if ($existing) {
             return $this->sendError(409, 'DUPLICATE_NAME', 'A role with this name already exists');
         }
 
-        $role = Role::create([
-            'name'        => $data['name'],
-            'description' => $data['description'] ?? null,
-            'permissions' => $data['permissions'] ?? [],
-        ]);
+        try {
+            $role = Role::create([
+                'name' => $data['name'],
+                'description' => $this->normalizeDescription($data['description'] ?? null),
+                'permissions' => $data['permissions'] ?? [],
+                'menu_access' => $data['menu_access'] ?? null,
+            ]);
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000' || str_contains($e->getMessage(), 'Integrity constraint')) {
+                $msg = strtolower($e->getMessage());
+                $looksLikeDuplicateName = str_contains($msg, 'roles.name') || str_contains($msg, 'unique');
+
+                return $this->sendError(
+                    409,
+                    $looksLikeDuplicateName ? 'DUPLICATE_NAME' : 'CONSTRAINT_VIOLATION',
+                    $looksLikeDuplicateName
+                        ? 'A role with this name already exists'
+                        : 'Could not save role. Check your input and try again.',
+                    app()->environment('testing') ? $e->getMessage() : null,
+                );
+            }
+            throw $e;
+        }
 
         return $this->sendOk($role);
     }
@@ -50,43 +82,79 @@ class RoleController extends Controller
     /**
      * Show a single role.
      */
-    public function show(int $id): JsonResponse
+    public function show(Role $role): JsonResponse
     {
-        $role = Role::withCount('users')->find($id);
-
-        if (!$role) {
-            return $this->sendError(404, 'NOT_FOUND', 'Role not found');
-        }
+        $role->loadCount('users');
 
         return $this->sendOk($role);
     }
 
     /**
      * Update an existing role.
+     *
+     * Only keys present in validated() are applied. Missing `permissions` / `menu_access`
+     * no longer wipe existing values (fixes “success toast but DB unchanged” when the
+     * client omits those keys from the validated payload).
      */
-    public function update(UpdateRoleRequest $request, int $id): JsonResponse
+    public function update(UpdateRoleRequest $request, Role $role): JsonResponse
     {
-        $role = Role::find($id);
-
-        if (!$role) {
-            return $this->sendError(404, 'NOT_FOUND', 'Role not found');
-        }
-
         $data = $request->validated();
 
-        // Check name uniqueness if changed
-        if ($data['name'] !== $role->name) {
-            $nameTaken = Role::where('name', $data['name'])->first();
+        if ($data === []) {
+            return $this->sendError(
+                400,
+                'BAD_REQUEST',
+                'No fields to update. Send JSON with one or more of: name, description, permissions, menu_access.',
+            );
+        }
+
+        // Check name uniqueness if changed (case-insensitive)
+        if (array_key_exists('name', $data) && strcasecmp($data['name'], $role->name) !== 0) {
+            $nameTaken = Role::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
+                ->where('id', '!=', $role->id)
+                ->first();
             if ($nameTaken) {
                 return $this->sendError(409, 'DUPLICATE_NAME', 'A role with this name already exists');
             }
         }
 
-        $role->update([
-            'name'        => $data['name'],
-            'description' => $data['description'] ?? null,
-            'permissions' => $data['permissions'] ?? [],
-        ]);
+        $updates = [];
+        if (array_key_exists('name', $data)) {
+            $updates['name'] = $data['name'];
+        }
+        if (array_key_exists('description', $data)) {
+            $updates['description'] = $this->normalizeDescription($data['description'] ?? null);
+        }
+        if (array_key_exists('permissions', $data)) {
+            $updates['permissions'] = is_array($data['permissions']) ? $data['permissions'] : [];
+        }
+        if (array_key_exists('menu_access', $data)) {
+            $updates['menu_access'] = $data['menu_access'];
+        }
+
+        try {
+            if ($updates !== []) {
+                $role->update($updates);
+            }
+            $role->refresh();
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000' || str_contains($e->getMessage(), 'Integrity constraint')) {
+                $msg = strtolower($e->getMessage());
+                $looksLikeDuplicateName = str_contains($msg, 'roles.name') || str_contains($msg, 'unique');
+
+                return $this->sendError(
+                    409,
+                    $looksLikeDuplicateName ? 'DUPLICATE_NAME' : 'CONSTRAINT_VIOLATION',
+                    $looksLikeDuplicateName
+                        ? 'A role with this name already exists'
+                        : 'Could not save role. Check your input and try again.',
+                    app()->environment('testing') ? $e->getMessage() : null,
+                );
+            }
+            throw $e;
+        }
+
+        $role->loadCount('users');
 
         return $this->sendOk($role);
     }
@@ -94,15 +162,9 @@ class RoleController extends Controller
     /**
      * Delete a role (only if not in use).
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Role $role): JsonResponse
     {
-        $role = Role::withCount('users')->find($id);
-
-        if (!$role) {
-            return $this->sendError(404, 'NOT_FOUND', 'Role not found');
-        }
-
-        if ($role->users_count > 0) {
+        if ($role->users()->count() > 0) {
             return $this->sendError(409, 'ROLE_IN_USE', 'Role is currently assigned to users and cannot be deleted');
         }
 

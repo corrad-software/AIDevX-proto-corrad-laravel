@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends Model
 {
@@ -19,6 +19,7 @@ class Role extends Model
         'name',
         'description',
         'permissions',
+        'menu_access',
     ];
 
     /**
@@ -30,14 +31,15 @@ class Role extends Model
     {
         return [
             'permissions' => 'array',
+            'menu_access' => 'array',
         ];
     }
 
     /**
-     * Get the users that belong to this role.
+     * Get the users that have this role.
      */
-    public function users(): HasMany
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(User::class);
+        return $this->belongsToMany(User::class, 'role_user')->withTimestamps();
     }
 }

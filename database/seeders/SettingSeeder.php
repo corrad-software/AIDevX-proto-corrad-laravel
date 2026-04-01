@@ -13,8 +13,8 @@ class SettingSeeder extends Seeder
     public function run(): void
     {
         $settings = [
-            ['key' => 'siteTitle', 'value' => 'CORRAD Laravel'],
-            ['key' => 'tagline', 'value' => 'Design system and admin standards.'],
+            ['key' => 'siteTitle', 'value' => 'KEHSA'],
+            ['key' => 'tagline', 'value' => 'Admin for SELAR & AINA'],
             ['key' => 'webfrontTitle', 'value' => 'CORRAD Laravel'],
             ['key' => 'webfrontTagline', 'value' => 'Design system and admin standards.'],
             ['key' => 'titleFormat', 'value' => '%page% | %site%'],

@@ -11,7 +11,7 @@ const GROUP_LABELS: Record<string, string> = {
   portal: "Webfront",
   "core-platform": "Core Platform",
   administration: "Administration",
-  kerisi: "AFSA",
+  kerisi: "KEHSA",
   development: "Development",
 };
 
@@ -52,8 +52,13 @@ export function collectAllMenuIds(tree: MenuTreeNode[]): string[] {
 export const MENU_PERMISSION_MAP: Record<string, string | string[] | undefined> = {
   "kerisi-chat": "chat.use",
   "kerisi-user-chat": "chat.use",
-  "kerisi-ticket": ["tickets.view", "tickets.respond"],
-  "ticket-365-log": ["tickets.view", "tickets.respond"],
+  "admin-ticket-support": "tickets.view",
+  "kerisi-ticket": undefined,
+  "kerisi-desk365-log": ["knowledge.view", "knowledge.manage", "tickets.view", "tickets.create", "tickets.respond"],
+  "kerisi-internal-ticket-log": ["knowledge.view", "knowledge.manage", "tickets.view", "tickets.create", "tickets.respond"],
+  "internal-ticket-log": ["knowledge.view", "knowledge.manage", "tickets.view", "tickets.create", "tickets.respond"],
+  "ticket-monitoring": ["knowledge.view", "knowledge.manage", "tickets.view", "tickets.create", "tickets.respond"],
+  "kerisi-ticket-monitoring": ["knowledge.view", "knowledge.manage", "tickets.view", "tickets.create", "tickets.respond"],
   "kerisi-notifications": undefined,
   "kerisi-guide": undefined,
   "kerisi-about": undefined,

@@ -26,7 +26,10 @@ function iconTone(variant: "success" | "error" | "info") {
 </script>
 
 <template>
-  <div class="flex h-full max-w-[22rem] items-stretch gap-2 overflow-hidden py-0">
+  <div
+    class="flex h-full items-stretch gap-2 overflow-hidden py-0"
+    :class="latestToast?.variant === 'error' ? 'max-w-[28rem]' : 'max-w-[22rem]'"
+  >
     <Transition
       enter-active-class="transition-transform duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       enter-from-class="translate-x-[110%]"
@@ -50,7 +53,10 @@ function iconTone(variant: "success" | "error" | "info") {
 
           <div class="min-w-0 flex-1">
             <p class="truncate text-[10px] font-semibold uppercase leading-none tracking-[0.11em] opacity-70">{{ variantLabel(latestToast.variant) }}</p>
-            <p class="mt-[2px] truncate text-xs font-semibold leading-tight">
+            <p
+              class="mt-[2px] text-xs font-semibold leading-tight"
+              :class="latestToast.variant === 'error' ? 'break-words whitespace-normal' : 'truncate'"
+            >
               {{ latestToast.title }}<span v-if="latestToast.message" class="font-normal opacity-90"> - {{ latestToast.message }}</span>
             </p>
           </div>

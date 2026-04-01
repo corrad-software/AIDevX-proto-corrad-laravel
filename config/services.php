@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'assistant_id' => env('OPENAI_ASSISTANT_ID'),
+        'user_chat_assistant_id' => env('OPENAI_USER_CHAT_ASSISTANT_ID', ''),
+        'vector_store_id' => env('OPENAI_VECTOR_STORE_ID'),
+    ],
+
+    'kerisi' => [
+        'system_url' => env('KERISI_SYSTEM_URL', 'http://myfisv2-tourism.datasc.dev'),
+    ],
+
+    'desk365' => [
+        'base_url' => rtrim(env('DESK365_BASE_URL', 'https://datasc.desk365.io/apis'), '/'),
+        'api_key' => env('DESK365_API_KEY'),
+    ],
+
 ];

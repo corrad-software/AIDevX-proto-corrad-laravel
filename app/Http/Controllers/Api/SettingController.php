@@ -72,13 +72,104 @@ class SettingController extends Controller
     }
 
     /**
+     * Get all lookups (e.g. system: [KERISI, iAGC, eGPA]).
+     */
+    public function lookups(): JsonResponse
+    {
+        return $this->sendOk([
+            'system' => $this->settingService->getLookup('system'),
+            'user_level' => $this->settingService->getLookup('userLevel'),
+            'user_category' => $this->settingService->getLookup('userCategory'),
+            'user_segment' => $this->settingService->getLookup('userSegment'),
+            'user_jenis_pengguna' => $this->settingService->getLookup('user_jenis_pengguna'),
+        ]);
+    }
+
+    /**
+     * Update lookups.
+     */
+    public function updateLookups(Request $request): JsonResponse
+    {
+        $data = $request->all();
+        if (isset($data['system']) && is_array($data['system'])) {
+            $this->settingService->setLookup('system', array_values(array_filter(array_map('trim', $data['system']))));
+        }
+        if (isset($data['user_level']) && is_array($data['user_level'])) {
+            $normalized = $this->normalizeCodeDescLookupRequestRows($data['user_level']);
+            $this->settingService->setLookup(
+                'userLevel',
+                $normalized !== [] ? $normalized : $this->settingService->defaultLookupUserLevel()
+            );
+        }
+        if (isset($data['user_category']) && is_array($data['user_category'])) {
+            $normalized = $this->normalizeCodeDescLookupRequestRows($data['user_category']);
+            $this->settingService->setLookup(
+                'userCategory',
+                $normalized !== [] ? $normalized : $this->settingService->defaultLookupUserCategory()
+            );
+        }
+        if (isset($data['user_segment']) && is_array($data['user_segment'])) {
+            $normalized = $this->normalizeCodeDescLookupRequestRows($data['user_segment']);
+            $this->settingService->setLookup(
+                'userSegment',
+                $normalized !== [] ? $normalized : $this->settingService->defaultLookupUserSegment()
+            );
+        }
+        if (isset($data['user_jenis_pengguna']) && is_array($data['user_jenis_pengguna'])) {
+            $normalized = $this->normalizeCodeDescLookupRequestRows($data['user_jenis_pengguna']);
+            $this->settingService->setLookup(
+                'user_jenis_pengguna',
+                $normalized !== [] ? $normalized : $this->settingService->defaultLookupUserJenisPengguna()
+            );
+        }
+
+        return $this->sendOk([
+            'system' => $this->settingService->getLookup('system'),
+            'user_level' => $this->settingService->getLookup('userLevel'),
+            'user_category' => $this->settingService->getLookup('userCategory'),
+            'user_segment' => $this->settingService->getLookup('userSegment'),
+            'user_jenis_pengguna' => $this->settingService->getLookup('user_jenis_pengguna'),
+        ]);
+    }
+
+    /**
+     * @param  array<int, mixed>  $input
+     * @return array<int, array{code: string, desc: string}>
+     */
+    private function normalizeCodeDescLookupRequestRows(array $input): array
+    {
+        $normalized = [];
+        $seen = [];
+        foreach ($input as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $code = isset($row['code']) ? trim((string) $row['code']) : '';
+            $desc = isset($row['desc']) ? trim((string) $row['desc']) : '';
+            if ($desc === '' && isset($row['label'])) {
+                $desc = trim((string) $row['label']);
+            }
+            if ($desc === '' && isset($row['description'])) {
+                $desc = trim((string) $row['description']);
+            }
+            if ($code === '' || $desc === '' || isset($seen[$code])) {
+                continue;
+            }
+            $seen[$code] = true;
+            $normalized[] = ['code' => $code, 'desc' => $desc];
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Get storefront menu.
      */
     public function storefrontMenu(): JsonResponse
     {
         $value = $this->settingService->get('storefrontMenu');
 
-        if (!$value) {
+        if (! $value) {
             return $this->sendOk([]);
         }
 
@@ -113,10 +204,10 @@ class SettingController extends Controller
         $withIds = [];
         foreach ($input as $index => $item) {
             $withIds[] = [
-                'id'           => !empty(trim($item['id'] ?? '')) ? trim($item['id']) : 'menu_' . ($index + 1),
-                'label'        => $item['label'] ?? '',
-                'href'         => $item['href'] ?? '',
-                'parentId'     => $item['parentId'] ?? null,
+                'id' => ! empty(trim($item['id'] ?? '')) ? trim($item['id']) : 'menu_'.($index + 1),
+                'label' => $item['label'] ?? '',
+                'href' => $item['href'] ?? '',
+                'parentId' => $item['parentId'] ?? null,
                 'openInNewTab' => $item['openInNewTab'] ?? false,
             ];
         }

@@ -2,9 +2,13 @@
     "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
-    "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+  "scripts": {
+    "build": "vite build",
+    "build:admin": "npm --prefix client run build:laravel",
+    "build:admin:watch": "npm --prefix client run build:laravel:watch",
+    "dev": "vite",
+    "dev:client": "npm --prefix client run dev",
+        "dev:stack": "npx concurrently -c \"#93c5fd,#34d399\" \"php artisan serve --host=127.0.0.1 --port=8090\" \"npm --prefix client run dev\" --names=api,client --kill-others"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

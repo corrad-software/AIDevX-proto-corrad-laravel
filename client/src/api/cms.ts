@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import type {
+  AgentPicklistItem,
   AuditLog,
   Category,
   CategoryInput,
@@ -9,7 +10,12 @@ import type {
   ChatSuggestion,
   Customer,
   CustomerInput,
+  DatabaseRowsPayload,
+  DatabaseSchemaPayload,
   Desk365SyncLog,
+  InternalTicketSyncLog,
+  KnowledgeExtractSyncLog,
+  TicketMonitoringPayload,
   InAppNotification,
   Desk365Ticket,
   Desk365TicketChat,
@@ -28,9 +34,14 @@ import type {
   SupportTicketMessage,
   StorefrontMenuItem,
   UserDetail,
-  UserInput,
+  CodeDescLookupRow,
+  UserLevelLookupRow,
+  CreateUserInput,
+  UpdateUserInput,
 } from "@/types";
 import type { AdminMenuPrefs } from "@/config/admin-menu";
+
+export type PostsByYearRow = { year: number; count: number };
 
 export async function fetchDashboardSummary() {
   return apiRequest<{
@@ -40,11 +51,13 @@ export async function fetchDashboardSummary() {
         | "internal_admin"
         | "external_admin"
         | "agent"
-        | "user";
+        | "user"
+        | "secondary_user";
       counts: { posts: number; pages: number; media: number; users: number };
       recent: { posts: Post[]; pages: Page[] };
       support?: { ticketCount: number | null };
       unreadNotifications?: number;
+      postsByYear?: PostsByYearRow[];
     };
   }>("/api/dashboard/summary");
 }
@@ -103,6 +116,8 @@ export async function adminDeleteNotification(id: number) {
 export type DashboardAnalytics = {
   ticketsByAgent: Record<string, number>;
   ticketsByModule: Record<string, number>;
+  internalTicketsByAgent: Record<string, number>;
+  internalTicketsByModule: Record<string, number>;
   chatSessionsByUser: { user: string; count: number }[];
   topAgents: { agent: string; count: number }[];
   newTickets: Array<Record<string, unknown>>;
@@ -203,11 +218,99 @@ export async function updateSettings(payload: SettingsPayload) {
 }
 
 export async function getLookups() {
-  return apiRequest<{ data: { system: string[] } }>("/api/settings/lookups");
+  return apiRequest<{
+    data: {
+      system: string[];
+      userLevel: UserLevelLookupRow[];
+      userCategory: CodeDescLookupRow[];
+      userSegment: CodeDescLookupRow[];
+      userJenisPengguna: CodeDescLookupRow[];
+    };
+  }>("/api/settings/lookups");
 }
 
-export async function updateLookups(payload: { system: string[] }) {
-  return apiRequest<{ data: { system: string[] } }>("/api/settings/lookups", {
+/**
+ * Prefer authenticated `/api/settings/lookups`; if that fails or returns all-empty, use `GET /api/settings`
+ * (public) which includes the same `lookupUserLevel` / `lookupSystem` / `lookupUserCategory` keys.
+ */
+export async function getLookupsWithFallback(): Promise<{
+  system: string[];
+  userLevel: UserLevelLookupRow[];
+  userCategory: CodeDescLookupRow[];
+  userSegment: CodeDescLookupRow[];
+  userJenisPengguna: CodeDescLookupRow[];
+}> {
+  let fromLookups: {
+    system: string[];
+    userLevel: UserLevelLookupRow[];
+    userCategory: CodeDescLookupRow[];
+    userSegment: CodeDescLookupRow[];
+    userJenisPengguna: CodeDescLookupRow[];
+  } | null = null;
+  try {
+    const res = await getLookups();
+    fromLookups = {
+      system: res.data.system ?? [],
+      userLevel: res.data.userLevel ?? [],
+      userCategory: res.data.userCategory ?? [],
+      userSegment: res.data.userSegment ?? [],
+      userJenisPengguna: res.data.userJenisPengguna ?? [],
+    };
+  } catch {
+    fromLookups = null;
+  }
+
+  const hasAny =
+    fromLookups &&
+    (fromLookups.userLevel.length > 0 ||
+      fromLookups.system.length > 0 ||
+      fromLookups.userCategory.length > 0 ||
+      fromLookups.userSegment.length > 0 ||
+      fromLookups.userJenisPengguna.length > 0);
+
+  if (hasAny && fromLookups) {
+    return fromLookups;
+  }
+
+  try {
+    const res = await getSettings();
+    const d = res.data;
+    return {
+      system: Array.isArray(d.lookupSystem) ? d.lookupSystem : [],
+      userLevel: Array.isArray(d.lookupUserLevel) ? d.lookupUserLevel : [],
+      userCategory: Array.isArray(d.lookupUserCategory) ? d.lookupUserCategory : [],
+      userSegment: Array.isArray(d.lookupUserSegment) ? d.lookupUserSegment : [],
+      userJenisPengguna: Array.isArray(d.lookupUserJenisPengguna) ? d.lookupUserJenisPengguna : [],
+    };
+  } catch {
+    return (
+      fromLookups ?? {
+        system: [],
+        userLevel: [],
+        userCategory: [],
+        userSegment: [],
+        userJenisPengguna: [],
+      }
+    );
+  }
+}
+
+export async function updateLookups(payload: {
+  system: string[];
+  userLevel: UserLevelLookupRow[];
+  userCategory: CodeDescLookupRow[];
+  userSegment: CodeDescLookupRow[];
+  userJenisPengguna: CodeDescLookupRow[];
+}) {
+  return apiRequest<{
+    data: {
+      system: string[];
+      userLevel: UserLevelLookupRow[];
+      userCategory: CodeDescLookupRow[];
+      userSegment: CodeDescLookupRow[];
+      userJenisPengguna: CodeDescLookupRow[];
+    };
+  }>("/api/settings/lookups", {
     method: "PUT",
     body: JSON.stringify(payload),
   });
@@ -248,8 +351,25 @@ export async function getPublicPageBySlug(slug: string) {
 }
 
 // Users
-export async function listUsers() {
-  return apiRequest<{ data: UserDetail[] }>("/api/users");
+/** Agents assignable by current user (hierarchy-scoped). For create/edit user — Agent field. */
+export async function listAgentPicklist(
+  excludeUserId?: number,
+  opts?: { forMention?: boolean; customerId?: number },
+) {
+  const p = new URLSearchParams();
+  if (excludeUserId != null) p.set("exclude_user_id", String(excludeUserId));
+  if (opts?.forMention) p.set("for_mention", "1");
+  if (opts?.customerId != null) p.set("customer_id", String(opts.customerId));
+  const qs = p.toString();
+  return apiRequest<{ data: AgentPicklistItem[] }>(`/api/users/agent-picklist${qs ? `?${qs}` : ""}`);
+}
+
+export async function listUsers(params = "") {
+  const q = params.startsWith("?") || params === "" ? params : `?${params}`;
+  return apiRequest<{
+    data: UserDetail[];
+    meta?: { page: number; limit: number; total: number; totalPages: number };
+  }>(`/api/users${q}`);
 }
 
 /** Search users by name or email (min 1 char in UI). Requires users list permission. */
@@ -267,11 +387,11 @@ export async function getUser(id: number) {
   return apiRequest<{ data: UserDetail }>(`/api/users/${id}`);
 }
 
-export async function createUser(input: UserInput) {
+export async function createUser(input: CreateUserInput) {
   return apiRequest<{ data: UserDetail }>("/api/users", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function updateUser(id: number, input: UserInput) {
+export async function updateUser(id: number, input: UpdateUserInput) {
   return apiRequest<{ data: UserDetail }>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(input) });
 }
 
@@ -402,8 +522,123 @@ export async function syncDesk365Tickets() {
   });
 }
 
+export async function getInternalTicketsPreview(limit = 30) {
+  return apiRequest<{ data: Desk365Ticket[]; meta: { count: number } }>(
+    `/api/knowledge/internal-tickets-preview?limit=${limit}`
+  );
+}
+
+export async function syncInternalTickets() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      totalTickets: number;
+      modulesSynced: number;
+      uploaded: number;
+      failed: number;
+      message: string;
+    };
+  }>("/api/knowledge/sync-internal-tickets", {
+    method: "POST",
+    timeoutMs: 180_000,
+  });
+}
+
+export async function syncKnowledgeSchema() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      message: string;
+      output?: string;
+    };
+  }>("/api/knowledge/sync-schema", {
+    method: "POST",
+    timeoutMs: 600_000,
+  });
+}
+
+export async function syncKnowledgeLookup() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      message: string;
+      output?: string;
+    };
+  }>("/api/knowledge/sync-lookup", {
+    method: "POST",
+    timeoutMs: 600_000,
+  });
+}
+
+export async function syncKnowledgeMenuAccess() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      message: string;
+      output?: string;
+    };
+  }>("/api/knowledge/sync-menu-access", {
+    method: "POST",
+    timeoutMs: 600_000,
+  });
+}
+
+export async function syncKnowledgePages() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      message: string;
+      output?: string;
+    };
+  }>("/api/knowledge/sync-pages", {
+    method: "POST",
+    timeoutMs: 600_000,
+  });
+}
+
+export async function syncKnowledgeBl() {
+  const { ensureCsrfCookie } = await import("./client");
+  await ensureCsrfCookie(true);
+  return apiRequest<{
+    data: {
+      success: boolean;
+      message: string;
+      output?: string;
+    };
+  }>("/api/knowledge/sync-bl", {
+    method: "POST",
+    timeoutMs: 600_000,
+  });
+}
+
 export async function listDesk365SyncLogs(params = "") {
   return apiRequest<{ data: Desk365SyncLog[]; meta: Record<string, unknown> }>(`/api/knowledge/desk365-sync-logs${params}`);
+}
+
+export async function listInternalTicketSyncLogs(params = "") {
+  return apiRequest<{ data: InternalTicketSyncLog[]; meta: Record<string, unknown> }>(
+    `/api/knowledge/internal-ticket-sync-logs${params}`
+  );
+}
+
+export async function listKnowledgeExtractSyncLogs(params = "") {
+  return apiRequest<{ data: KnowledgeExtractSyncLog[]; meta: Record<string, unknown> }>(
+    `/api/knowledge/extract-sync-logs${params}`
+  );
+}
+
+export async function getTicketMonitoring() {
+  return apiRequest<{ data: TicketMonitoringPayload }>("/api/tickets/monitoring");
 }
 
 // KERISI Chat
@@ -582,9 +817,12 @@ export async function getSupportTicket(id: number) {
 export async function createSupportTicket(input: {
   subject: string;
   description: string;
+  customerName?: string;
+  systemName?: string;
   module?: string;
-  type?: string;
+  type?: "bugs" | "request" | "question";
   priority?: "low" | "normal" | "high" | "urgent";
+  aiAssistanceEnabled?: boolean;
 }) {
   return apiRequest<{ data: SupportTicket }>("/api/tickets", { method: "POST", body: JSON.stringify(input) });
 }
@@ -594,10 +832,13 @@ export async function updateSupportTicket(
   input: Partial<{
     subject: string;
     description: string;
+    customerName: string;
+    systemName: string;
     module: string;
-    type: string;
+    type: "bugs" | "request" | "question";
     priority: "low" | "normal" | "high" | "urgent";
     status: "new" | "assigned" | "in_progress" | "pending_requestor" | "resolved" | "closed";
+    aiAssistanceEnabled?: boolean;
   }>,
 ) {
   return apiRequest<{ data: SupportTicket }>(`/api/tickets/${id}`, { method: "PATCH", body: JSON.stringify(input) });
@@ -616,7 +857,13 @@ export async function assignSupportTicket(id: number, assignedToUserId: number, 
 
 export async function replySupportTicket(
   id: number,
-  input: { message: string; isInternal?: boolean; status?: "in_progress" | "pending_requestor" | "resolved" | "closed" },
+  input: {
+    message: string;
+    isInternal?: boolean;
+    status?: "in_progress" | "pending_requestor" | "resolved" | "closed";
+    /** From @mention picker — server sends in-app notification to each user. */
+    mentionedUserIds?: number[];
+  },
 ) {
   return apiRequest<{ data: SupportTicketMessage }>(`/api/tickets/${id}/reply`, {
     method: "POST",
@@ -624,8 +871,22 @@ export async function replySupportTicket(
   });
 }
 
+/** Cadangan draf balasan untuk ejen (tiket mesti sudah ditugaskan). */
+export async function postTicketAgentReplySuggest(id: number, input?: { regeneratePrompt?: string }) {
+  return apiRequest<{ data: { suggestion: string } }>(`/api/tickets/${id}/agent-reply-suggest`, {
+    method: "POST",
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
 export async function closeSupportTicket(id: number) {
   return apiRequest<{ data: SupportTicket }>(`/api/tickets/${id}/close`, { method: "POST" });
+}
+
+export async function rejectSupportTicketAi(id: number) {
+  return apiRequest<{ data: { ticket: SupportTicket; deletedAiMessages: number } }>(`/api/tickets/${id}/reject-ai`, {
+    method: "POST",
+  });
 }
 
 export async function listChatFavorites(params = "") {
@@ -646,4 +907,58 @@ export async function searchChatMessages(sessionId: number, q: string) {
 
 export async function getChatSuggestions() {
   return apiRequest<{ data: ChatSuggestion[] }>("/api/chat/suggestions");
+}
+
+// Database explorer (requires `database.manage`)
+export async function listDatabaseTables() {
+  return apiRequest<{ data: { tables: string[] } }>("/api/database/tables");
+}
+
+export async function getDatabaseTableSchema(table: string) {
+  const t = encodeURIComponent(table);
+  return apiRequest<{ data: DatabaseSchemaPayload }>(`/api/database/tables/${t}/schema`);
+}
+
+export async function getDatabaseTableRows(
+  table: string,
+  params: { page?: number; limit?: number; sortBy?: string; sortDir?: "asc" | "desc" } = {},
+) {
+  const t = encodeURIComponent(table);
+  const q = new URLSearchParams();
+  if (params.page != null) q.set("page", String(params.page));
+  if (params.limit != null) q.set("limit", String(params.limit));
+  if (params.sortBy) q.set("sort_by", params.sortBy);
+  if (params.sortDir) q.set("sort_dir", params.sortDir);
+  const qs = q.toString();
+  return apiRequest<{ data: DatabaseRowsPayload; meta: { page: number; limit: number; total: number; totalPages: number } }>(
+    `/api/database/tables/${t}/rows${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export async function createDatabaseRow(table: string, row: Record<string, unknown>) {
+  const t = encodeURIComponent(table);
+  return apiRequest<{ data: Record<string, unknown> }>(`/api/database/tables/${t}/rows`, {
+    method: "POST",
+    body: JSON.stringify({ row }),
+  });
+}
+
+export async function updateDatabaseRow(
+  table: string,
+  primaryKey: Record<string, unknown>,
+  row: Record<string, unknown>,
+) {
+  const t = encodeURIComponent(table);
+  return apiRequest<{ data: Record<string, unknown> }>(`/api/database/tables/${t}/rows`, {
+    method: "PUT",
+    body: JSON.stringify({ primaryKey, row }),
+  });
+}
+
+export async function deleteDatabaseRow(table: string, primaryKey: Record<string, unknown>) {
+  const t = encodeURIComponent(table);
+  return apiRequest<{ data: { success: boolean } }>(`/api/database/tables/${t}/rows`, {
+    method: "DELETE",
+    body: JSON.stringify({ primaryKey }),
+  });
 }

@@ -24,12 +24,14 @@ function push(input: {
   variant?: ToastVariant;
   durationMs?: number;
 }) {
+  const variant = input.variant ?? "info";
+  const defaultDuration = variant === "error" ? 6000 : 3000;
   const toast: ToastItem = {
     id: nextToastId++,
     title: input.title,
     message: input.message,
-    variant: input.variant ?? "info",
-    durationMs: input.durationMs ?? 3000,
+    variant,
+    durationMs: input.durationMs ?? defaultDuration,
   };
 
   toasts.value = [...toasts.value, toast];

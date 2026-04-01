@@ -6,6 +6,8 @@ import MainDashboardView from "@/views/MainDashboardView.vue";
 import KitchenChartsView from "@/views/KitchenChartsView.vue";
 import KitchenFormsView from "@/views/KitchenFormsView.vue";
 import LoginView from "@/views/LoginView.vue";
+import RegisterView from "@/views/RegisterView.vue";
+import VerifyEmailView from "@/views/VerifyEmailView.vue";
 import MediaLibraryView from "@/views/MediaLibraryView.vue";
 import KitchenSinkView from "@/views/KitchenSinkView.vue";
 import PageEditorView from "@/views/PageEditorView.vue";
@@ -28,8 +30,26 @@ import SettingsView from "@/views/SettingsView.vue";
 import SystemInfoView from "@/views/SystemInfoView.vue";
 import UsersView from "@/views/UsersView.vue";
 import UserEditView from "@/views/UserEditView.vue";
+import CustomersView from "@/views/CustomersView.vue";
+import CustomerEditorView from "@/views/CustomerEditorView.vue";
 import StorefrontHomeView from "@/views/StorefrontHomeView.vue";
 import StorefrontPageView from "@/views/StorefrontPageView.vue";
+import KerisiChatView from "@/views/KerisiChatView.vue";
+import KerisiUserChatView from "@/views/KerisiUserChatView.vue";
+import KerisiTicketView from "@/views/KerisiTicketView.vue";
+import KerisiGuideView from "@/views/KerisiGuideView.vue";
+import KerisiAboutView from "@/views/KerisiAboutView.vue";
+import KnowledgeManageView from "@/views/KnowledgeManageView.vue";
+import Desk365SyncLogView from "@/views/Desk365SyncLogView.vue";
+import InternalTicketSyncLogView from "@/views/InternalTicketSyncLogView.vue";
+import KnowledgeExtractSyncLogView from "@/views/KnowledgeExtractSyncLogView.vue";
+import TicketMonitoringView from "@/views/TicketMonitoringView.vue";
+import ForgotPasswordView from "@/views/ForgotPasswordView.vue";
+import ResetPasswordView from "@/views/ResetPasswordView.vue";
+import ResendVerificationView from "@/views/ResendVerificationView.vue";
+import NotificationsListView from "@/views/NotificationsListView.vue";
+import NotificationCenterAdminView from "@/views/NotificationCenterAdminView.vue";
+import DatabaseExplorerView from "@/views/DatabaseExplorerView.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useSiteStore } from "@/stores/site";
 
@@ -80,6 +100,16 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/admin/login", name: "login", component: LoginView, meta: { guestOnly: true, title: "Login" } },
+    { path: "/admin/register", name: "register", component: RegisterView, meta: { guestOnly: true, title: "Register" } },
+    { path: "/admin/forgot-password", name: "forgot-password", component: ForgotPasswordView, meta: { guestOnly: true, title: "Forgot password" } },
+    { path: "/admin/reset-password", name: "reset-password", component: ResetPasswordView, meta: { guestOnly: true, title: "Reset password" } },
+    {
+      path: "/admin/resend-verification",
+      name: "resend-verification",
+      component: ResendVerificationView,
+      meta: { guestOnly: true, title: "Resend verification" },
+    },
+    { path: "/verify-email", name: "verify-email", component: VerifyEmailView, meta: { guestOnly: true, title: "Verify email" } },
     { path: "/admin", name: "main-dashboard", component: MainDashboardView, meta: { requiresAuth: true, title: "Main Dashboard" } },
     { path: "/admin/portal/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true, title: "Dashboard" } },
     { path: "/admin/posts", name: "posts", component: PostsListView, meta: { requiresAuth: true, title: "Posts" } },
@@ -127,6 +157,9 @@ const router = createRouter({
     { path: "/admin/platform/identity/users/:id", name: "platform-user-edit", component: UserEditView, meta: { requiresAuth: true, title: "Edit User" } },
     { path: "/admin/platform/identity/roles", name: "platform-rbac", component: RolesView, meta: { requiresAuth: true, title: "RBAC" } },
     { path: "/admin/platform/identity/tokens", name: "platform-tokens", component: ComingSoonView, meta: { requiresAuth: true, title: "Token Management" } },
+    { path: "/admin/platform/customers", name: "platform-customers", component: CustomersView, meta: { requiresAuth: true, title: "Customer Setup" } },
+    { path: "/admin/platform/customers/new", name: "platform-customer-create", component: CustomerEditorView, meta: { requiresAuth: true, title: "New Customer" } },
+    { path: "/admin/platform/customers/:id", name: "platform-customer-edit", component: CustomerEditorView, meta: { requiresAuth: true, title: "Edit Customer" } },
 
     // ── Core Platform: Observability (Grafana) ──
     { path: "/admin/platform/observability", redirect: "/admin/platform/observability/audit-trail" },
@@ -144,7 +177,7 @@ const router = createRouter({
     // ── Core Platform: Messaging ──
     { path: "/admin/platform/messaging", redirect: "/admin/platform/messaging/event-bus" },
     { path: "/admin/platform/messaging/event-bus", name: "platform-event-bus", component: ComingSoonView, meta: { requiresAuth: true, title: "Event Bus" } },
-    { path: "/admin/platform/messaging/notifications", name: "platform-notifications", component: ComingSoonView, meta: { requiresAuth: true, title: "Notifications" } },
+    { path: "/admin/platform/messaging/notifications", name: "platform-messaging-notifications", component: ComingSoonView, meta: { requiresAuth: true, title: "Notifications" } },
 
     // ── Backward-compat redirects from old governance/communication paths ──
     { path: "/admin/platform/governance", redirect: "/admin/platform/observability/audit-trail" },
@@ -180,12 +213,58 @@ const router = createRouter({
     { path: "/admin/platform/integration/api", redirect: "/admin/platform/gateway/routes" },
     { path: "/admin/platform/integration/webhooks", redirect: "/admin/platform/gateway/webhooks" },
 
+    // ── Core Platform: Desk365 & internal ticket AI sync logs ──
+    { path: "/admin/platform/desk365", name: "platform-desk365", component: Desk365SyncLogView, meta: { requiresAuth: true, title: "Desk365 log" } },
+    {
+      path: "/admin/platform/ticket-log",
+      name: "platform-ticket-log",
+      component: InternalTicketSyncLogView,
+      meta: { requiresAuth: true, title: "Ticket log" },
+    },
+    {
+      path: "/admin/platform/knowledge-extract-log",
+      name: "platform-knowledge-extract-log",
+      component: KnowledgeExtractSyncLogView,
+      meta: { requiresAuth: true, title: "Knowledge extract log" },
+    },
+    {
+      path: "/admin/tickets/monitoring",
+      name: "tickets-monitoring",
+      component: TicketMonitoringView,
+      meta: { requiresAuth: true, title: "Ticket monitoring" },
+    },
+    {
+      path: "/admin/platform/notifications",
+      name: "platform-notifications",
+      component: NotificationCenterAdminView,
+      meta: { requiresAuth: true, title: "Notification Center" },
+    },
+    {
+      path: "/admin/platform/database",
+      name: "platform-database",
+      component: DatabaseExplorerView,
+      meta: { requiresAuth: true, title: "Database" },
+    },
     // ── Core Platform: AI Integration ──
     { path: "/admin/platform/ai", redirect: "/admin/platform/ai/providers" },
     { path: "/admin/platform/ai/providers", name: "platform-ai-providers", component: ComingSoonView, meta: { requiresAuth: true, title: "AI Providers" } },
     { path: "/admin/platform/ai/models", name: "platform-ai-models", component: ComingSoonView, meta: { requiresAuth: true, title: "AI Models" } },
     { path: "/admin/platform/ai/prompts", name: "platform-ai-prompts", component: ComingSoonView, meta: { requiresAuth: true, title: "Prompt Templates" } },
     { path: "/admin/platform/ai/usage", name: "platform-ai-usage", component: ComingSoonView, meta: { requiresAuth: true, title: "AI Usage & Billing" } },
+
+    // ── AFSA: SELAR (Support) + AINA (User Chat) + KB / tickets / guide ──
+    { path: "/admin/kerisi/chat", name: "kerisi-chat", component: KerisiChatView, meta: { requiresAuth: true, title: "SELAR — Support Chat" } },
+    { path: "/admin/kerisi/user-chat", name: "kerisi-user-chat", component: KerisiUserChatView, meta: { requiresAuth: true, title: "AINA — User" } },
+    { path: "/admin/kerisi/ticket", name: "kerisi-ticket", component: KerisiTicketView, meta: { requiresAuth: true, title: "Ticket" } },
+    { path: "/admin/kerisi/notifications", name: "kerisi-notifications", component: NotificationsListView, meta: { requiresAuth: true, title: "Notifications" } },
+    { path: "/admin/kerisi/guide", name: "kerisi-guide", component: KerisiGuideView, meta: { requiresAuth: true, title: "Guide" } },
+    {
+    path: "/admin/kerisi/about",
+    name: "kerisi-about",
+    component: KerisiAboutView,
+    meta: { requiresAuth: true, title: "About KERISI" },
+  },
+    { path: "/admin/kerisi/knowledge", name: "kerisi-knowledge", component: KnowledgeManageView, meta: { requiresAuth: true, title: "Knowledge Base" } },
 
     // ── Backward-compat redirects from old settings paths ──
     ...settingsRedirects,

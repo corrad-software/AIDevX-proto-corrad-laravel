@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DatabaseExplorerController;
 use App\Http\Controllers\Api\DevelopersGuideController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\KnowledgeController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\NotificationController;
@@ -17,8 +19,12 @@ use App\Http\Controllers\Api\PublicController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\TicketMonitoringController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
+
+// Diagnostics (no auth) — DB + migrations; Isu #3
+Route::get('/health', HealthController::class);
 
 // Public routes (no auth)
 Route::prefix('public')->group(function () {
@@ -58,6 +64,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('posts', PostController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('pages', PageController::class);
+    // Must be before users resource so "agent-picklist" is not captured as {user}
+    Route::get('/users/agent-picklist', [UserController::class, 'agentPicklist']);
     Route::apiResource('users', UserController::class);
     Route::apiResource('roles', RoleController::class);
     Route::apiResource('customers', CustomerController::class);
@@ -92,6 +100,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
 
+    Route::prefix('database')->middleware('permission:database.manage')->group(function () {
+        Route::get('/tables', [DatabaseExplorerController::class, 'tables']);
+        Route::get('/tables/{table}/schema', [DatabaseExplorerController::class, 'schema'])->where('table', '[a-zA-Z0-9_]+');
+        Route::get('/tables/{table}/rows', [DatabaseExplorerController::class, 'rows'])->where('table', '[a-zA-Z0-9_]+');
+        Route::post('/tables/{table}/rows', [DatabaseExplorerController::class, 'storeRow'])->where('table', '[a-zA-Z0-9_]+');
+        Route::put('/tables/{table}/rows', [DatabaseExplorerController::class, 'updateRow'])->where('table', '[a-zA-Z0-9_]+');
+        Route::delete('/tables/{table}/rows', [DatabaseExplorerController::class, 'destroyRow'])->where('table', '[a-zA-Z0-9_]+');
+    });
+
     Route::get('/developers-guide', [DevelopersGuideController::class, 'show']);
     Route::put('/developers-guide', [DevelopersGuideController::class, 'update']);
 
@@ -104,7 +121,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/knowledge/desk365-status', [KnowledgeController::class, 'desk365Status'])->middleware('permission:knowledge.manage');
     Route::get('/knowledge/desk365-tickets', [KnowledgeController::class, 'desk365Tickets'])->middleware('permission:knowledge.manage');
     Route::post('/knowledge/sync-desk365-tickets', [KnowledgeController::class, 'syncDesk365Tickets'])->middleware('permission:knowledge.manage');
-    Route::get('/knowledge/desk365-sync-logs', [KnowledgeController::class, 'desk365SyncLogs'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-schema', [KnowledgeController::class, 'syncDatabaseSchema'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-lookup', [KnowledgeController::class, 'syncKnowledgeLookup'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-menu-access', [KnowledgeController::class, 'syncKnowledgeMenuAccess'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-pages', [KnowledgeController::class, 'syncKnowledgePages'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-bl', [KnowledgeController::class, 'syncKnowledgeBl'])->middleware('permission:knowledge.manage');
+    Route::get('/knowledge/extract-sync-logs', [KnowledgeController::class, 'knowledgeExtractSyncLogs']);
+    Route::get('/knowledge/desk365-sync-logs', [KnowledgeController::class, 'desk365SyncLogs']);
+    Route::get('/knowledge/internal-tickets-preview', [KnowledgeController::class, 'internalTicketsPreview'])->middleware('permission:knowledge.manage');
+    Route::post('/knowledge/sync-internal-tickets', [KnowledgeController::class, 'syncInternalTickets'])->middleware('permission:knowledge.manage');
+    Route::get('/knowledge/internal-ticket-sync-logs', [KnowledgeController::class, 'internalTicketSyncLogs']);
     Route::get('/knowledge', [KnowledgeController::class, 'index'])->middleware('permission:knowledge.view');
     Route::post('/knowledge/upload', [KnowledgeController::class, 'upload'])->middleware('permission:knowledge.manage');
     Route::delete('/knowledge/{id}', [KnowledgeController::class, 'destroy'])->middleware('permission:knowledge.manage');
@@ -114,15 +140,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/chat/tickets/{ticketId}', [ChatController::class, 'ticketDetail']);
 
     // Internal support tickets (AFSA)
-    Route::get('/tickets', [SupportTicketController::class, 'index'])->middleware('permission:tickets.view');
-    Route::post('/tickets', [SupportTicketController::class, 'store'])->middleware('permission:tickets.create');
-    Route::get('/tickets/{id}', [SupportTicketController::class, 'show'])->middleware('permission:tickets.view')->whereNumber('id');
-    Route::put('/tickets/{id}', [SupportTicketController::class, 'update'])->middleware('permission:tickets.edit')->whereNumber('id');
-    Route::patch('/tickets/{id}', [SupportTicketController::class, 'update'])->middleware('permission:tickets.edit')->whereNumber('id');
-    Route::delete('/tickets/{id}', [SupportTicketController::class, 'destroy'])->middleware('permission:tickets.delete')->whereNumber('id');
-    Route::post('/tickets/{id}/assign', [SupportTicketController::class, 'assign'])->middleware('permission:tickets.assign')->whereNumber('id');
-    Route::post('/tickets/{id}/reply', [SupportTicketController::class, 'reply'])->middleware('permission:tickets.respond')->whereNumber('id');
-    Route::post('/tickets/{id}/close', [SupportTicketController::class, 'close'])->middleware('permission:tickets.respond')->whereNumber('id');
+    Route::get('/tickets/monitoring', [TicketMonitoringController::class, 'index']);
+    Route::get('/tickets', [SupportTicketController::class, 'index']);
+    Route::post('/tickets', [SupportTicketController::class, 'store']);
+    Route::get('/tickets/{id}', [SupportTicketController::class, 'show'])->whereNumber('id');
+    Route::put('/tickets/{id}', [SupportTicketController::class, 'update'])->whereNumber('id');
+    Route::patch('/tickets/{id}', [SupportTicketController::class, 'update'])->whereNumber('id');
+    Route::delete('/tickets/{id}', [SupportTicketController::class, 'destroy'])->whereNumber('id');
+    Route::post('/tickets/{id}/assign', [SupportTicketController::class, 'assign'])->whereNumber('id');
+    Route::post('/tickets/{id}/agent-reply-suggest', [SupportTicketController::class, 'agentReplySuggestion'])
+        ->whereNumber('id')
+        ->middleware('throttle:20,1');
+    Route::post('/tickets/{id}/reply', [SupportTicketController::class, 'reply'])->whereNumber('id');
+    Route::post('/tickets/{id}/reject-ai', [SupportTicketController::class, 'rejectAi'])->whereNumber('id');
+    Route::post('/tickets/{id}/close', [SupportTicketController::class, 'close'])->whereNumber('id');
 
     // KERISI Support Chat (agent, admin, super_admin only)
     Route::middleware(['permission:chat.use', 'support_chat_access'])->group(function () {

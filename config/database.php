@@ -64,6 +64,32 @@ return [
             ]) : [],
         ],
 
+        'myfis' => [
+            'driver' => 'mysql',
+            'host' => env('MYFIS_DB_HOST', '127.0.0.1'),
+            'port' => env('MYFIS_DB_PORT', '3307'),
+            'database' => env('MYFIS_DB_DATABASE', 'fims'),
+            'username' => env('MYFIS_DB_USERNAME', 'admin'),
+            'password' => env('MYFIS_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+        ],
+
+        'myfis_usr' => [
+            'driver' => 'mysql',
+            'host' => env('MYFIS_DB_HOST', '127.0.0.1'),
+            'port' => env('MYFIS_DB_PORT', '3307'),
+            'database' => env('MYFIS_DB_USR', 'fims_usr'),
+            'username' => env('MYFIS_DB_USERNAME', 'admin'),
+            'password' => env('MYFIS_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

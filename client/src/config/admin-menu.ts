@@ -1,5 +1,7 @@
 import type { Component } from "vue";
 import {
+  BarChart3,
+  Bell,
   BookOpen,
   Bot,
   Cable,
@@ -9,14 +11,20 @@ import {
   FileText,
   Gauge,
   Image,
+  Info,
   LayoutGrid,
   Link2,
   ListChecks,
   Mail,
   Menu,
+  MessageSquare,
+  RefreshCw,
   Settings,
   Shield,
+  Ticket,
 } from "lucide-vue-next";
+
+import { KERISI_MENU_GROUP_LABEL } from "@/config/branding";
 
 export type MenuNode = {
   id: string;
@@ -51,14 +59,15 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
     id: "dashboard",
     label: "",
     items: [
-      { id: "main-dashboard", label: "Dashboard", to: "/admin", icon: Gauge },
+      { id: "main-dashboard", label: "Main Dashboard", to: "/admin", icon: Gauge },
     ],
   },
   {
     id: "portal",
     label: "Webfront",
     items: [
-      { id: "dashboard", label: "Dashboard", to: "/admin/portal/dashboard", icon: Gauge },
+      // NOTE: must be unique; "dashboard" collides with top-level group id and leaks visibility.
+      { id: "webfront-dashboard", label: "Webfront Dashboard", to: "/admin/portal/dashboard", icon: Gauge },
       {
         id: "posts",
         label: "Posts",
@@ -96,22 +105,6 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
     label: "Core Platform",
     items: [
       {
-        id: "identity-access",
-        label: "Identity & Access",
-        to: "/admin/platform/identity",
-        icon: Shield,
-        children: [
-          { id: "platform-auth", label: "Authentication", to: "/admin/platform/identity/users",
-            children: [
-              { id: "platform-users-all", label: "All Users", to: "/admin/platform/identity/users" },
-              { id: "platform-users-new", label: "Add User", to: "/admin/platform/identity/users/new" },
-            ],
-          },
-          { id: "platform-rbac", label: "RBAC", to: "/admin/platform/identity/roles" },
-          { id: "platform-tokens", label: "Token Management", to: "/admin/platform/identity/tokens" },
-        ],
-      },
-      {
         id: "observability",
         label: "Observability",
         to: "/admin/platform/observability",
@@ -142,7 +135,8 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
         icon: Mail,
         children: [
           { id: "platform-event-bus", label: "Event Bus", to: "/admin/platform/messaging/event-bus" },
-          { id: "platform-notifications", label: "Notifications", to: "/admin/platform/messaging/notifications" },
+          // Distinct id from Administration → "Notification Center" (platform-notifications) to avoid RBAC / router clashes.
+          { id: "platform-messaging-notifications", label: "Notifications", to: "/admin/platform/messaging/notifications" },
         ],
       },
       {
@@ -189,6 +183,38 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
     id: "administration",
     label: "Administration",
     items: [
+      {
+        id: "identity-access",
+        label: "Identity & Access",
+        to: "/admin/platform/identity",
+        icon: Shield,
+        children: [
+          { id: "platform-auth", label: "Authentication", to: "/admin/platform/identity/users",
+            children: [
+              { id: "platform-users-all", label: "User List", to: "/admin/platform/identity/users" },
+              { id: "platform-users-new", label: "Add User", to: "/admin/platform/identity/users/new" },
+            ],
+          },
+          { id: "platform-rbac", label: "RBAC", to: "/admin/platform/identity/roles" },
+          { id: "platform-customers", label: "Customer Setup", to: "/admin/platform/customers" },
+          { id: "platform-tokens", label: "Token Management", to: "/admin/platform/identity/tokens" },
+        ],
+      },
+      { id: "desk365", label: "Desk365 log", to: "/admin/platform/desk365", icon: RefreshCw },
+      {
+        id: "internal-ticket-log",
+        label: "Ticket log",
+        to: "/admin/platform/ticket-log",
+        icon: Ticket,
+      },
+      {
+        id: "ticket-monitoring",
+        label: "Ticket monitoring",
+        to: "/admin/tickets/monitoring",
+        icon: BarChart3,
+      },
+      { id: "admin-ticket-support", label: "Ticket admin", to: "/admin/kerisi/ticket", icon: Ticket },
+      { id: "platform-notifications", label: "Notification Center", to: "/admin/platform/notifications", icon: Bell },
       { id: "menus", label: "Menus", to: "/admin/menus", icon: Menu },
       {
         id: "settings",
@@ -200,6 +226,43 @@ export const DEFAULT_MENU: MenuGroupDef[] = [
           { id: "settings-system", label: "System", to: "/admin/settings/system" },
         ],
       },
+      {
+        id: "admin-database",
+        label: "Database",
+        to: "/admin/platform/database",
+        icon: Database,
+      },
+    ],
+  },
+  {
+    id: "kerisi",
+    label: KERISI_MENU_GROUP_LABEL,
+    items: [
+      { id: "kerisi-user-chat", label: "AINA — User", to: "/admin/kerisi/user-chat", icon: MessageSquare },
+      { id: "kerisi-chat", label: "SELAR — Support", to: "/admin/kerisi/chat", icon: MessageSquare },
+      { id: "kerisi-knowledge", label: "Knowledge Base", to: "/admin/kerisi/knowledge", icon: Bot },
+      {
+        id: "kerisi-desk365-log",
+        label: "Desk365 log",
+        to: "/admin/platform/desk365",
+        icon: RefreshCw,
+      },
+      {
+        id: "kerisi-internal-ticket-log",
+        label: "Ticket log",
+        to: "/admin/platform/ticket-log",
+        icon: Ticket,
+      },
+      {
+        id: "kerisi-ticket-monitoring",
+        label: "Ticket monitoring",
+        to: "/admin/tickets/monitoring",
+        icon: BarChart3,
+      },
+      { id: "kerisi-ticket", label: "Ticket", to: "/admin/kerisi/ticket", icon: Ticket },
+      { id: "kerisi-notifications", label: "Notifications", to: "/admin/kerisi/notifications", icon: Bell },
+      { id: "kerisi-guide", label: "Guide", to: "/admin/kerisi/guide", icon: BookOpen },
+      { id: "kerisi-about", label: "About", to: "/admin/kerisi/about", icon: Info },
     ],
   },
   {

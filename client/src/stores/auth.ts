@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 
 import { getMe, login, logout, updateProfile as apiUpdateProfile, changePassword as apiChangePassword, uploadAvatar as apiUploadAvatar, removeAvatar as apiRemoveAvatar } from "@/api/auth";
+import { ensureCsrfCookie } from "@/api/client";
 import type { User } from "@/types";
 
 export const useAuthStore = defineStore("auth", {
@@ -17,6 +18,7 @@ export const useAuthStore = defineStore("auth", {
       if (this.initialized) return;
       this.initialized = true;
       try {
+        await ensureCsrfCookie();
         const response = await getMe();
         this.user = response.data.user;
       } catch {
@@ -26,9 +28,10 @@ export const useAuthStore = defineStore("auth", {
     async signIn(email: string, password: string) {
       this.loading = true;
       try {
-        await login(email, password);
-        const me = await getMe();
-        this.user = me.data.user;
+        // Use user from login response — avoids second /me round-trip (fixes "Invalid response from server"
+        // when /me returned non-JSON e.g. session/cookie or proxy issues).
+        const res = await login(email, password);
+        this.user = res.data.user;
       } finally {
         this.loading = false;
       }
@@ -51,6 +54,14 @@ export const useAuthStore = defineStore("auth", {
     async removeAvatar() {
       const response = await apiRemoveAvatar();
       this.user = response.data.user;
+    },
+    async refreshUser() {
+      const response = await getMe();
+      this.user = response.data.user;
+    },
+    /** Clear local user when API returns 401 (expired session) without calling logout endpoint. */
+    clearStaleSession() {
+      this.user = null;
     },
   },
 });

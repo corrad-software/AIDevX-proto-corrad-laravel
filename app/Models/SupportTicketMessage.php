@@ -16,12 +16,14 @@ class SupportTicketMessage extends Model
         'user_id',
         'message',
         'is_internal',
+        'is_ai_message',
     ];
 
     protected function casts(): array
     {
         return [
             'is_internal' => 'boolean',
+            'is_ai_message' => 'boolean',
         ];
     }
 

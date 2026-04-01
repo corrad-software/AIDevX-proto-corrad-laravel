@@ -14,6 +14,7 @@ use App\Mail\EmailVerificationMail;
 use App\Mail\PasswordResetMail;
 use App\Models\Customer;
 use App\Models\User;
+use App\Services\AppNotificationService;
 use App\Services\AuditService;
 use App\Services\EmailVerificationService;
 use App\Services\UserHierarchyService;
@@ -23,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -35,6 +37,7 @@ class AuthController extends Controller
         protected AuditService $auditService,
         protected EmailVerificationService $emailVerification,
         protected UserHierarchyService $hierarchy,
+        protected AppNotificationService $appNotifications,
     ) {}
 
     /**
@@ -51,7 +54,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user();
-        if (($user->user_level ?? '') === UserLevel::USER && ! $user->email_verified_at) {
+        if (UserLevel::isEndUserTier($user->user_level ?? '') && ! $user->email_verified_at) {
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -59,7 +62,11 @@ class AuthController extends Controller
             return $this->sendError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email before signing in. Check your inbox or use “Resend verification”.');
         }
 
-        $this->auditService->logAuth('login', $user);
+        try {
+            $this->auditService->logAuth('login', $user);
+        } catch (\Throwable $e) {
+            Log::warning('audit_login_failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+        }
 
         return $this->sendOk([
             'user' => $this->userPayload($user),
@@ -249,7 +256,7 @@ class AuthController extends Controller
 
     /**
      * Impersonate another user.
-     * Super Admin: Levels 1–4. Internal Admin: 1–4 (not 0). External Admin: agent, user. Agent: user only.
+     * Super Admin: Levels 1–5 (not 0). Internal Admin: same. External Admin: agent, user, secondary_user. Agent: end users only.
      */
     public function impersonate(Request $request): JsonResponse
     {
@@ -321,21 +328,18 @@ class AuthController extends Controller
 
         $q = $request->input('q');
         $query = User::where('is_active', true)
-            ->where('id', '!=', $realUser->id)
-            ->whereIn('user_level', $allowedTargets);
-        if (UserLevel::normalize($level) !== UserLevel::SUPER_ADMIN) {
-            $visibleIds = $this->hierarchy->visibleUserIdsFor($realUser, true);
-            if ($visibleIds === []) {
-                return $this->sendOk([]);
-            }
-            $query->whereIn('id', $visibleIds);
-        }
+            ->where('id', '!=', $realUser->id);
         if ($q && strlen($q) >= 2) {
             $query->where(function ($b) use ($q) {
                 $b->where('name', 'like', '%'.$q.'%')->orWhere('email', 'like', '%'.$q.'%');
             });
         }
-        $users = $query->orderBy('name')->limit(50)->get(['id', 'name', 'email']);
+        $users = $query->orderBy('name')->limit(300)->get(['id', 'name', 'email', 'user_level']);
+
+        $users = $users
+            ->filter(fn ($u) => UserLevel::canImpersonateTarget($level, (string) $u->user_level))
+            ->take(50)
+            ->values();
 
         return $this->sendOk($users->map(fn ($u) => [
             'id' => $u->id,
@@ -457,6 +461,18 @@ class AuthController extends Controller
         $menuAccess = $this->resolveMenuAccess($user);
         $permissions = $user->getAllPermissions();
         $customerRow = $user->customers()->first();
+        $customerLinks = $user->customers()
+            ->orderBy('customer_name')
+            ->orderBy('system_name')
+            ->get()
+            ->map(fn (Customer $c) => [
+                'id' => $c->id,
+                'customer_code' => $c->customer_code,
+                'customer_name' => $c->customer_name,
+                'system_name' => $c->system_name,
+            ])
+            ->values()
+            ->all();
 
         return [
             'id' => $user->id,
@@ -468,6 +484,7 @@ class AuthController extends Controller
             'customer_code' => $user->customer_code,
             'customer_display_name' => $customerRow?->customer_name ?? $user->customer_code,
             'system_display_name' => $customerRow?->system_name,
+            'customer_links' => $customerLinks,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'menu_access' => $menuAccess,
             'permissions' => $permissions,

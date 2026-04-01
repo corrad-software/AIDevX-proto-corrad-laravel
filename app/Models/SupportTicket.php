@@ -16,10 +16,14 @@ class SupportTicket extends Model
         'ticket_number',
         'subject',
         'description',
+        'customer_name',
+        'system_name',
         'module',
         'type',
         'priority',
         'status',
+        'ai_assistance_enabled',
+        'ai_awaiting_satisfaction',
         'created_by_user_id',
         'assigned_to_user_id',
         'assigned_by_user_id',
@@ -33,6 +37,8 @@ class SupportTicket extends Model
         return [
             'assigned_at' => 'datetime',
             'closed_at' => 'datetime',
+            'ai_assistance_enabled' => 'boolean',
+            'ai_awaiting_satisfaction' => 'boolean',
         ];
     }
 

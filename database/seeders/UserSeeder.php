@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\UserLevel;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
@@ -16,15 +16,23 @@ class UserSeeder extends Seeder
     {
         $adminRole = Role::where('name', 'admin')->firstOrFail();
 
-        User::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@example.com')],
+        // Plain password: User model uses `password` => `hashed` cast (Hash::make on save).
+        // Override via .env: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME.
+        $adminEmail = env('ADMIN_EMAIL', 'admin@example.com') ?: 'admin@example.com';
+        $adminPassword = env('ADMIN_PASSWORD') ?: 'admin12345';
+
+        // Roles live on `role_user` pivot (migration 2026_03_22_000002 dropped users.role_id).
+        $user = User::updateOrCreate(
+            ['email' => $adminEmail],
             [
-                'name' => env('ADMIN_NAME', 'Administrator'),
-                'password' => Hash::make(env('ADMIN_PASSWORD', 'admin12345')),
+                'name' => env('ADMIN_NAME', 'Administrator') ?: 'Administrator',
+                'password' => $adminPassword,
                 'is_active' => true,
                 'role' => 'admin',
-                'role_id' => $adminRole->id,
+                'user_level' => UserLevel::SUPER_ADMIN,
+                'email_verified_at' => now(),
             ]
         );
+        $user->roles()->sync([$adminRole->id]);
     }
 }

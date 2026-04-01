@@ -12,6 +12,13 @@ class StoreRoleRequest extends BaseFormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('menuAccess') && ! $this->has('menu_access')) {
+            $this->merge(['menu_access' => $this->input('menuAccess')]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -20,10 +27,12 @@ class StoreRoleRequest extends BaseFormRequest
     public function rules(): array
     {
         return [
-            'name'          => 'required|string|min:1|unique:roles,name',
-            'description'   => 'nullable|string',
-            'permissions'   => 'nullable|array',
+            'name' => 'required|string|min:1|unique:roles,name',
+            'description' => 'nullable|string',
+            'permissions' => 'nullable|array',
             'permissions.*' => 'string',
+            'menu_access' => 'nullable|array',
+            'menu_access.*' => 'string',
         ];
     }
 }

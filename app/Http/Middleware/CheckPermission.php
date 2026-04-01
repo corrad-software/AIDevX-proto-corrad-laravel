@@ -11,12 +11,23 @@ class CheckPermission
     {
         $user = $request->user();
 
-        if (!$user || !$user->hasPermission($permission)) {
+        if (! $user) {
             return response()->json([
                 'error' => [
                     'code' => 'FORBIDDEN',
                     'message' => 'You do not have permission to perform this action.',
-                ]
+                ],
+            ], 403);
+        }
+
+        $user->loadMissing('roles');
+
+        if (! $user->hasPermission($permission)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'message' => 'You do not have permission to perform this action.',
+                ],
             ], 403);
         }
 

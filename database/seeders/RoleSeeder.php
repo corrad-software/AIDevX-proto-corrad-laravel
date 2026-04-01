@@ -29,6 +29,7 @@ class RoleSeeder extends Seeder
                     'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
                     'notifications.admin',
                     'tickets.view', 'tickets.create', 'tickets.edit', 'tickets.delete', 'tickets.assign', 'tickets.respond',
+                    'database.manage',
                 ],
             ]
         );

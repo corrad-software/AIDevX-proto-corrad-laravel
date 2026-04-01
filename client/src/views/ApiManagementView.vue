@@ -5,7 +5,7 @@ import { Braces, Check, ChevronDown, Copy, Search, ShieldCheck } from "lucide-vu
 import { API_BASE_URL } from "@/env";
 import AdminLayout from "@/layouts/AdminLayout.vue";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type MethodTab = "ALL" | HttpMethod;
 type EndpointAuth = "public" | "auth";
 
@@ -93,7 +93,7 @@ const groups: Group[] = [
       { method: "GET", path: "/api/roles", summary: "List roles", auth: "auth", csrf: false },
       { method: "POST", path: "/api/roles", summary: "Create role", auth: "auth", csrf: true, body: '{ "name": "editor", "description": "Can edit content", "permissions": ["posts.read", "posts.write"] }' },
       { method: "GET", path: "/api/roles/{role}", summary: "Get role by id", auth: "auth", csrf: false },
-      { method: "PUT", path: "/api/roles/{role}", summary: "Update role", auth: "auth", csrf: true },
+      { method: "PATCH", path: "/api/roles/{role}", summary: "Update role", auth: "auth", csrf: true },
       { method: "DELETE", path: "/api/roles/{role}", summary: "Delete role", auth: "auth", csrf: true },
       { method: "GET", path: "/api/dashboard/summary", summary: "Dashboard summary stats", auth: "auth", csrf: false },
       { method: "GET", path: "/api/audit-logs", summary: "List audit logs with filters and pagination", auth: "auth", csrf: false },
@@ -107,13 +107,14 @@ const requiresCsrfOnly = ref(false);
 const copiedEndpointKey = ref("");
 
 const allEndpoints = computed(() => groups.flatMap((group) => group.endpoints));
-const tabs: MethodTab[] = ["ALL", "GET", "POST", "PUT", "DELETE"];
+const tabs: MethodTab[] = ["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"];
 
 const tabStats = computed(() => ({
   ALL: allEndpoints.value.length,
   GET: allEndpoints.value.filter((endpoint) => endpoint.method === "GET").length,
   POST: allEndpoints.value.filter((endpoint) => endpoint.method === "POST").length,
   PUT: allEndpoints.value.filter((endpoint) => endpoint.method === "PUT").length,
+  PATCH: allEndpoints.value.filter((endpoint) => endpoint.method === "PATCH").length,
   DELETE: allEndpoints.value.filter((endpoint) => endpoint.method === "DELETE").length,
 }));
 
@@ -138,6 +139,7 @@ function methodClass(method: HttpMethod) {
   if (method === "GET") return "bg-emerald-100 text-emerald-700";
   if (method === "POST") return "bg-blue-100 text-blue-700";
   if (method === "PUT") return "bg-amber-100 text-amber-700";
+  if (method === "PATCH") return "bg-violet-100 text-violet-700";
   return "bg-rose-100 text-rose-700";
 }
 

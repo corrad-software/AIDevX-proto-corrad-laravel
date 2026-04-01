@@ -95,6 +95,9 @@ class Permission
 
     const TICKETS_RESPOND = 'tickets.respond';
 
+    /** Browse tables, schema, and row data; insert/update/delete via Database explorer (high risk). */
+    const DATABASE_MANAGE = 'database.manage';
+
     /**
      * Menu item IDs that require specific permission(s).
      * If user has menu_access to an item, they get the implied permission(s).
@@ -105,11 +108,46 @@ class Permission
         return [
             'kerisi-chat' => self::CHAT_USE,
             'kerisi-user-chat' => self::CHAT_USE,
+            'admin-ticket-support' => self::TICKETS_VIEW,
             'kerisi-knowledge' => [self::KNOWLEDGE_VIEW, self::KNOWLEDGE_MANAGE],
+            'kerisi-desk365-log' => [
+                self::KNOWLEDGE_VIEW,
+                self::KNOWLEDGE_MANAGE,
+                self::TICKETS_VIEW,
+                self::TICKETS_CREATE,
+                self::TICKETS_RESPOND,
+            ],
+            'kerisi-internal-ticket-log' => [
+                self::KNOWLEDGE_VIEW,
+                self::KNOWLEDGE_MANAGE,
+                self::TICKETS_VIEW,
+                self::TICKETS_CREATE,
+                self::TICKETS_RESPOND,
+            ],
+            'internal-ticket-log' => [
+                self::KNOWLEDGE_VIEW,
+                self::KNOWLEDGE_MANAGE,
+                self::TICKETS_VIEW,
+                self::TICKETS_CREATE,
+                self::TICKETS_RESPOND,
+            ],
+            'ticket-monitoring' => [
+                self::KNOWLEDGE_VIEW,
+                self::KNOWLEDGE_MANAGE,
+                self::TICKETS_VIEW,
+                self::TICKETS_CREATE,
+                self::TICKETS_RESPOND,
+            ],
+            'kerisi-ticket-monitoring' => [
+                self::KNOWLEDGE_VIEW,
+                self::KNOWLEDGE_MANAGE,
+                self::TICKETS_VIEW,
+                self::TICKETS_CREATE,
+                self::TICKETS_RESPOND,
+            ],
             'platform-messaging-notifications' => self::NOTIFICATIONS_ADMIN,
             'platform-notifications' => self::NOTIFICATIONS_ADMIN,
-            'ticket-365-log' => [self::TICKETS_VIEW, self::TICKETS_RESPOND],
-            'kerisi-ticket' => [self::TICKETS_VIEW, self::TICKETS_RESPOND],
+            'admin-database' => self::DATABASE_MANAGE,
         ];
     }
 
@@ -129,6 +167,7 @@ class Permission
             self::CUSTOMERS_VIEW, self::CUSTOMERS_CREATE, self::CUSTOMERS_EDIT, self::CUSTOMERS_DELETE,
             self::NOTIFICATIONS_ADMIN,
             self::TICKETS_VIEW, self::TICKETS_CREATE, self::TICKETS_EDIT, self::TICKETS_DELETE, self::TICKETS_ASSIGN, self::TICKETS_RESPOND,
+            self::DATABASE_MANAGE,
         ];
     }
 }

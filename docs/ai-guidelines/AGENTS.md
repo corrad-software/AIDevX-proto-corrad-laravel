@@ -12,7 +12,7 @@
 | Frontend | Vue 3 + TypeScript + Tailwind CSS 4 + Pinia 3 + Vite 7 |
 | Database | SQLite (dev), MySQL (prod) |
 | Auth | Sanctum session-based SPA auth, RBAC via `Permission` class |
-| Commands | `composer setup` (init), `composer dev` (run all), `composer test` (PHPUnit) |
+| Commands | `composer setup` (init), `composer dev` (run all), `composer test` (PHPUnit), `composer deploy` (production — see `docs/process/deployment.md`) |
 
 ---
 

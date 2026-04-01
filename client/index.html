@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CORRAD Laravel</title>
+    <title>KEHSA — KERISI HelpDesk SELAR &amp; AINA</title>
+    <script>
+      (function () {
+        try {
+          var a = localStorage.getItem("admin.theme.appearance");
+          var dark = false;
+          if (a === "dark") dark = true;
+          else if (a === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) dark = true;
+          document.documentElement.classList.toggle("dark", dark);
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
