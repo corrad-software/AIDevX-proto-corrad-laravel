@@ -1,4 +1,4 @@
-from php:8.3-fpm-alpine as base
+from php:8.4-fpm-alpine as base
 
 workdir /var/www/html
 
@@ -13,6 +13,8 @@ run apk add --no-cache \
     freetype-dev \
     oniguruma-dev \
     libxml2-dev \
+    libzip-dev \
+    zlib-dev \
     zip \
     unzip \
     nodejs \
@@ -20,7 +22,7 @@ run apk add --no-cache \
 
 # Configure PHP extensions required by Laravel
 run docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 copy --from=composer:2 /usr/bin/composer /usr/bin/composer
