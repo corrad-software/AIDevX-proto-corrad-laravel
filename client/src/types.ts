@@ -704,6 +704,10 @@ export type Desk365TicketChat = {
   ticketNumber: string;
   subject: string;
   description: string;
+  /** Human-readable status, used in KerisiChatView sidebar + prompts. */
+  statusLabel?: string;
+  /** Category / grouping label for monitoring; optional in API. */
+  category?: string;
   subCategory?: string;
   type?: string;
   priority?: string;
