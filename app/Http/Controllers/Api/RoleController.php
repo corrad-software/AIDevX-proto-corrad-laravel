@@ -15,8 +15,7 @@ class RoleController extends Controller
     use ApiResponse;
 
     /**
-     * DB column `roles.description` is NOT NULL. ConvertEmptyStringsToNull middleware + nullable
-     * validation turns "" into null — persist as empty string instead of violating NOT NULL.
+     * Persist description as empty string when omitted; DB column is nullable (MySQL disallows DEFAULT on TEXT).
      */
     private function normalizeDescription(mixed $value): string
     {

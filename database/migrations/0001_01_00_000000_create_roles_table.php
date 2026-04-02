@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->text('description')->default('');
+            // MySQL: TEXT/BLOB cannot use DEFAULT; app always sets description via RoleController::normalizeDescription
+            $table->text('description')->nullable();
             $table->json('permissions');
             $table->timestamps();
         });
