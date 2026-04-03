@@ -33,9 +33,9 @@ copy . /var/www/html
 # Install PHP dependencies
 run composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-# Install and build client (Vue) assets
+# Install and build client (Vue) → public/spa/ (Laravel routes/web.php expects spa/index.html)
 workdir /var/www/html/client
-run npm install && npm run build
+run npm install && npm run build:laravel
 
 # Back to Laravel root for final setup
 workdir /var/www/html
